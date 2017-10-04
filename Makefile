@@ -1,5 +1,5 @@
 obj-m := lattop.o
-lattop-objs := p03_main.o
+lattop-objs := p03_main.o p03_kprobe.o
 
 CONFIG_MODULE_SIG=n
 KDIR := ~/linux
