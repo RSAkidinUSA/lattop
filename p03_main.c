@@ -4,13 +4,13 @@ static int __init p03_init(void) {
     int ret;
     printk(PRINT_PREF "Latency Profiler Module loaded...\n");
     /* focus on getting the other functionality working first, then kprobe */
-    /* ret = ins_probe(); */
+    ret = ins_probe();
     return 0;
 }
 
 static void __exit p03_exit(void) {
     /* focus on getting the other functionality working first, then kprobe */
-    /* rm_probe(); */
+    rm_probe();
     printk(PRINT_PREF "Latency module unloaded...\n");
 }
 

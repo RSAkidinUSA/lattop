@@ -4,7 +4,7 @@
 
 /* enqueueing kprobe */
 #define MAX_SYMBOL_LEN	64
-static char symbol_en[MAX_SYMBOL_LEN] = "FIGURE THIS OUT";
+static char symbol_en[MAX_SYMBOL_LEN] = "activate_task";
 module_param_string(symbol_en, symbol_en, sizeof(symbol_en), 0644);
 
 
@@ -42,7 +42,7 @@ static int handler_en_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 
 /* dequeueing kprobe */
 
-static char symbol_de[MAX_SYMBOL_LEN] = "FIGURE THIS OUT";
+static char symbol_de[MAX_SYMBOL_LEN] = "deactivate_task";
 module_param_string(symbol_de, symbol_de, sizeof(symbol_de), 0644);
 
 static struct kprobe kp_de = {
