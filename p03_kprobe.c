@@ -1,6 +1,7 @@
 #include "p03_module.h"
 #include <linux/kprobes.h>
 #include <config/x86/tsc.h>
+#include <linux/sched.h>
 
 /* enqueueing kprobe */
 #define MAX_SYMBOL_LEN	64
@@ -16,7 +17,10 @@ static struct kprobe kp_en = {
 /* kprobe pre_handler: called just before the probed instruction is executed */
 static int handler_en_pre(struct kprobe *p, struct pt_regs *regs)
 {
-    printk(PRINT_PREF "kprobe_en_pre worked %llu\n", rdtsc());
+    struct task_struct *t_s;
+    long long unsigned t = rdtsc();
+    t_s = (struct task_struct *)regs->si;
+    printk(PRINT_PREF "pid: %d", (int)t_s->pid);
     return 0;
 }
 
@@ -24,7 +28,7 @@ static int handler_en_pre(struct kprobe *p, struct pt_regs *regs)
 static void handler_en_post(struct kprobe *p, struct pt_regs *regs,
 				unsigned long flags)
 {
-    printk(PRINT_PREF "kprobe_en_post worked\n");
+    /* printk(PRINT_PREF "kprobe_en_post worked\n"); */
 }
 
 /*
@@ -52,7 +56,10 @@ static struct kprobe kp_de = {
 /* kprobe pre_handler: called just before the probed instruction is executed */
 static int handler_de_pre(struct kprobe *p, struct pt_regs *regs)
 {
-    printk(PRINT_PREF "kprobe_de_pre worked %llu\n", rdtsc());
+    struct task_struct *t_s;
+    long long unsigned t = rdtsc();
+    t_s = (struct task_struct *)regs->si;
+    printk(PRINT_PREF "pid: %d", (int)t_s->pid);
     return 0;
 }
 
@@ -60,7 +67,7 @@ static int handler_de_pre(struct kprobe *p, struct pt_regs *regs)
 static void handler_de_post(struct kprobe *p, struct pt_regs *regs,
 				unsigned long flags)
 {
-    printk(PRINT_PREF "kprobe_de_post worked\n");
+    /* printk(PRINT_PREF "kprobe_de_post worked\n"); */
 }
 
 /*
