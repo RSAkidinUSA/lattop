@@ -8,3 +8,6 @@
 
 int ins_probe(void);
 void rm_probe(void);
+
+int rb_init(void);
+void rb_free(void);

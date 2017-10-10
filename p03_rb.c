@@ -1,86 +1,142 @@
 #include "p03_module.h"
 #include <linux/rbtree.h>
+#include <linux/types.h>
+
+/* tree usage is as follows: */
+/* init the tree */
+/* check if item is in tree */
+/* 1) if yes, save info and remove */
+/* create new node with updated info */
+/* add to tree */
+/* delete tree when finished */
 
 /* RB tree code */
 
-struct intRoot {
+struct taskRoot {
     struct rb_root tree;
 };
 
-struct intNode {
-    struct rb_node  int_node;
-    int             int_key;
+/* root of the tree */
+static struct taskRoot *myRoot;
+
+struct taskNode {
+    struct rb_node  task_node;
+    long long       sleep_time; /* key */
+    pid_t           pid;
+    long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
 };
 
-void init_intRoot(struct intRoot *intRoot) {
-    intRoot->tree = RB_ROOT;
+void init_taskRoot(struct taskRoot *taskRoot) {
+    taskRoot->tree = RB_ROOT;
 }
 
-void __enqueue_intNode(struct intRoot *intRoot, struct intNode *in) {
-    struct rb_node **link = &intRoot->tree.rb_node;
+/* add a node to the tree */
+static void __add_node(struct taskNode *tn) {
+    struct rb_node **link = &myRoot->tree.rb_node;
     struct rb_node *parent = NULL;
-    struct intNode *entry;
+    struct taskNode *entry;
 
     while (*link) {
         parent = *link;
-        entry = rb_entry(parent, struct intNode, int_node);
-        if (in->int_key < entry->int_key) {
+        entry = rb_entry(parent, struct taskNode, task_node);
+        if (tn->sleep_time < entry->sleep_time) {
             link = &parent->rb_left;
         } else {
             link = &parent->rb_right;
         }
     }
 
-    rb_link_node(&in->int_node, parent, link);
-    rb_insert_color(&in->int_node, &intRoot->tree);
+    rb_link_node(&tn->task_node, parent, link);
+    rb_insert_color(&tn->task_node, &myRoot->tree);
 }
 
-void rb_function(int *int_arr, int len) {
-    struct intRoot *myRoot;
-    struct intNode *currentNode, *lastNode;
-    struct rb_node *tempNode, *rmNode;
-    int i;
+/* print the tree */
+void printTree(void) {
+    struct rb_node *tempNode;
+    struct taskNode *currentNode;
+
+    tempNode = rb_first(&myRoot->tree);
+
+    while (tempNode != NULL) {
+        currentNode = rb_entry(tempNode, struct taskNode, task_node);
+        printk(PRINT_PREF "PID: %u, Sleep time: %llu", currentNode->pid, \
+                currentNode->sleep_time);
+        tempNode = rb_next(&currentNode->task_node);
+    }
+}
+
+/* search tree for a node with a given PID */
+static struct taskNode *__searchRB(pid_t pid) {
+    struct rb_node *tempNode;
+    struct taskNode *currentNode;
+
+    tempNode = rb_first(&myRoot->tree);
+
+    while (tempNode != NULL) {
+        currentNode = rb_entry(tempNode, struct taskNode, task_node);
+        if (currentNode->pid == pid) {
+            return currentNode;
+        }
+        tempNode = rb_next(&currentNode->task_node);
+    }
+    return NULL;
+}
+
+/* set asleep */
+/* check if task in tree, if so, set sleep time */
+/* else create new node and add */
+/* if unable to allocate memory return an error */
+int set_asleep(pid_t pid, long long time) {
+    struct taskNode *temp;
+    temp = __searchRB(pid);
+    if (temp == NULL) {
+        temp = kmalloc(sizeof(*temp), GFP_KERNEL);
+        if (temp == NULL) {
+            return ENOMEM;
+        }
+        temp->pid = pid;
+        temp->sleep_time = 0;
+    } else {
+        rb_erase(&temp->task_node, &myRoot->tree);
+    }
+    temp->start_sleep = time;
+    __add_node(temp);
+    return 0;
+}
+
+/* set awake */
+/* check if task in tree, if so, add diff to sleep time */
+/* if not, return -1 */
+int set_awake(pid_t pid, long long time) {
     
+    return 0;
+}
+
+
+
+/* initialize the rb tree */
+int rb_init(void) {
     /* create the RB tree */
-    printk(PRINT_PREF "Creating the red-black tree\n");
     myRoot = kmalloc(sizeof(*myRoot), GFP_KERNEL);
-    init_intRoot(myRoot);
-
-    /* insert values into the rb tree */
-    printk(PRINT_PREF "Inserting values into the red-black tree\n");
-    for (i = 0; i < len; i++) {
-        struct intNode *temp = kmalloc(sizeof(*temp), GFP_KERNEL);
-        temp->int_key = int_arr[i];
-        __enqueue_intNode(myRoot, temp);
+    init_taskRoot(myRoot);
+    if (myRoot == NULL) {
+        return ENOMEM;
     }
+    return 0;  
+}
 
-    /* iterate through rb tree and print values */
-    printk(PRINT_PREF "red-black tree values:\n");
-    tempNode = rb_last(&myRoot->tree);
-    lastNode = rb_entry(tempNode, struct intNode, int_node);
+/* delete the rb tree when done */
+void rb_free(void) {
+    struct rb_node *rmNode, *tempNode;
+    
     tempNode = rb_first(&myRoot->tree);
-    currentNode = rb_entry(tempNode, struct intNode, int_node);
-
-    while (currentNode != lastNode) {
-        printk(PRINT_PREF "%d\n", currentNode->int_key);
-        tempNode = rb_next(&currentNode->int_node);
-        currentNode = rb_entry(tempNode, struct intNode, int_node);
-    }
-    /* print the last node in the tree */
-    printk(PRINT_PREF "%d\n", currentNode->int_key);
-
-    /* delete the rb tree */
-    printk(PRINT_PREF "Removing items from the RB tree\n");
-    tempNode = rb_first(&myRoot->tree);
-    while (tempNode != rb_last(&myRoot->tree)) {
+    while (tempNode != NULL) {
         rmNode = tempNode;
         tempNode = rb_next(tempNode);
         rb_erase(rmNode, &myRoot->tree);
-        kfree(rb_entry(rmNode, struct intNode, int_node));
+        kfree(rb_entry(rmNode, struct taskNode, task_node));
     }
-    /* remove last item from the tree */
-    rb_erase(tempNode, &myRoot->tree);
-    kfree(rb_entry(tempNode, struct intNode, int_node));
-    printk(PRINT_PREF "Done.\n");
+    /* free the root */
+    kfree(myRoot);
 }
 
