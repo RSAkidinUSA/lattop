@@ -18,9 +18,9 @@ static struct kprobe kp_en = {
 static int handler_en_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
-    long long unsigned t = rdtsc();
+    long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
-    printk(PRINT_PREF "pid: %d", (int)t_s->pid);
+    //printk(PRINT_PREF "set_awake: %d\n", set_awake(t_s->pid, time));
     return 0;
 }
 
@@ -56,10 +56,7 @@ static struct kprobe kp_de = {
 /* kprobe pre_handler: called just before the probed instruction is executed */
 static int handler_de_pre(struct kprobe *p, struct pt_regs *regs)
 {
-    struct task_struct *t_s;
-    long long unsigned t = rdtsc();
-    t_s = (struct task_struct *)regs->si;
-    printk(PRINT_PREF "pid: %d", (int)t_s->pid);
+    /* printk(PRINT_PREF "kprobe_de_pre worked\n"); */
     return 0;
 }
 
@@ -67,6 +64,10 @@ static int handler_de_pre(struct kprobe *p, struct pt_regs *regs)
 static void handler_de_post(struct kprobe *p, struct pt_regs *regs,
 				unsigned long flags)
 {
+    struct task_struct *t_s;
+    long long unsigned time = rdtsc();
+    t_s = (struct task_struct *)regs->si;
+    printk(PRINT_PREF "set_asleep: %d\n", set_asleep(t_s->pid, time));
     /* printk(PRINT_PREF "kprobe_de_post worked\n"); */
 }
 

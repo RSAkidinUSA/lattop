@@ -97,6 +97,7 @@ int set_asleep(pid_t pid, long long time) {
         temp->pid = pid;
         temp->sleep_time = 0;
     } else {
+        return temp->pid;
         rb_erase(&temp->task_node, &myRoot->tree);
     }
     temp->start_sleep = time;
@@ -125,7 +126,7 @@ int set_awake(pid_t pid, long long time) {
 }
 
 /* print the tree */
-void printTree(void) {
+void print_rb(void) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
 
