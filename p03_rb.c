@@ -1,6 +1,9 @@
 #include "p03_module.h"
 #include <linux/rbtree.h>
 #include <linux/types.h>
+#include <linux/spinlock.h>
+
+static spinlock_t rb_lock;
 
 /* tree usage is as follows: */
 /* init the tree */
@@ -78,6 +81,7 @@ int rb_init(void) {
     if (myRoot == NULL) {
         return ENOMEM;
     }
+    spin_lock_init(&rb_lock);
     __init_taskRoot(myRoot);
     return 0;  
 }
@@ -88,10 +92,12 @@ int rb_init(void) {
 /* if unable to allocate memory return an error */
 int set_asleep(pid_t pid, unsigned long long time) {
     struct taskNode *temp;
+    spin_lock(&rb_lock);
     temp = __searchRB(pid);
     if (temp == NULL) {
         temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
         if (temp == NULL) {
+            spin_unlock(&rb_lock);
             return ENOMEM;
         }
         temp->pid = pid;
@@ -101,6 +107,7 @@ int set_asleep(pid_t pid, unsigned long long time) {
     }
     temp->start_sleep = time;
     __add_node(temp);
+    spin_unlock(&rb_lock);
     return 0;
 }
 
@@ -109,10 +116,13 @@ int set_asleep(pid_t pid, unsigned long long time) {
 /* else set the new sleep time */
 void set_awake(pid_t pid, unsigned long long time) {
     struct taskNode *temp;
+    spin_lock(&rb_lock);
     temp = __searchRB(pid);
     if (temp == NULL) {
+        spin_unlock(&rb_lock);
         return;
     } else if (temp->start_sleep  == -1) {
+        spin_unlock(&rb_lock);
         return;
     } else {
         rb_erase(&temp->task_node, &myRoot->tree);
@@ -120,6 +130,7 @@ void set_awake(pid_t pid, unsigned long long time) {
         temp->start_sleep = -1;
         __add_node(temp);
     }
+    spin_unlock(&rb_lock);
 }
 
 /* print the 1000 longest sleeping processes*/
@@ -131,6 +142,7 @@ void print_rb(void) {
     tempNode = rb_last(&myRoot->tree);
 
     printk(PRINT_PREF "Printing rb tree:\n");
+    spin_lock(&rb_lock);
     while (tempNode != NULL && i < 1000) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
         printk(PRINT_PREF "PID: %u,\tSleep time: %llu\n", currentNode->pid, \
@@ -138,18 +150,18 @@ void print_rb(void) {
         tempNode = rb_prev(&currentNode->task_node);
         i++;
     }
+    spin_unlock(&rb_lock);
 }
 
 
 /* delete the rb tree when done */
 void rb_free(void) {
-    struct rb_node *rmNode, *tempNode;
+    struct rb_node *tempNode;
     
     tempNode = rb_first(&myRoot->tree);
     while (tempNode != NULL) {
-        rmNode = tempNode;
-        rb_erase(rmNode, &myRoot->tree);
-        kfree(rb_entry(rmNode, struct taskNode, task_node));
+        rb_erase(tempNode, &myRoot->tree);
+        kfree(rb_entry(tempNode, struct taskNode, task_node));
         tempNode = rb_first(&myRoot->tree);
     }
     /* free the root */
