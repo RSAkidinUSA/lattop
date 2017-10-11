@@ -75,10 +75,10 @@ static struct taskNode *__searchRB(pid_t pid) {
 int rb_init(void) {
     /* create the RB tree */
     myRoot = kmalloc(sizeof(*myRoot), GFP_KERNEL);
-    __init_taskRoot(myRoot);
     if (myRoot == NULL) {
         return ENOMEM;
     }
+    __init_taskRoot(myRoot);
     return 0;  
 }
 
@@ -86,18 +86,17 @@ int rb_init(void) {
 /* check if task in tree, if so, set sleep time */
 /* else create new node and add */
 /* if unable to allocate memory return an error */
-int set_asleep(pid_t pid, long long time) {
+int set_asleep(pid_t pid, unsigned long long time) {
     struct taskNode *temp;
     temp = __searchRB(pid);
     if (temp == NULL) {
-        temp = kmalloc(sizeof(*temp), GFP_KERNEL);
+        temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
         if (temp == NULL) {
             return ENOMEM;
         }
         temp->pid = pid;
         temp->sleep_time = 0;
     } else {
-        return temp->pid;
         rb_erase(&temp->task_node, &myRoot->tree);
     }
     temp->start_sleep = time;
@@ -106,37 +105,38 @@ int set_asleep(pid_t pid, long long time) {
 }
 
 /* set awake */
-/* add diff to sleep time */
-/* if not in tree return 1 */
-/* if task not sleeping,  return 2 */
-int set_awake(pid_t pid, long long time) {
+/* if task not in tree or not sleeping, return */
+/* else set the new sleep time */
+void set_awake(pid_t pid, unsigned long long time) {
     struct taskNode *temp;
     temp = __searchRB(pid);
     if (temp == NULL) {
-        return 1;
+        return;
     } else if (temp->start_sleep  == -1) {
-        return 2;
+        return;
     } else {
         rb_erase(&temp->task_node, &myRoot->tree);
         temp->sleep_time += (time - temp->start_sleep);
         temp->start_sleep = -1;
         __add_node(temp);
     }
-    return 0;
 }
 
-/* print the tree */
+/* print the 1000 longest sleeping processes*/
 void print_rb(void) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
+    int i = 0;
 
-    tempNode = rb_first(&myRoot->tree);
+    tempNode = rb_last(&myRoot->tree);
 
-    while (tempNode != NULL) {
+    printk(PRINT_PREF "Printing rb tree:\n");
+    while (tempNode != NULL && i < 1000) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
-        printk(PRINT_PREF "PID: %u, Sleep time: %llu", currentNode->pid, \
+        printk(PRINT_PREF "PID: %u,\tSleep time: %llu\n", currentNode->pid, \
                 currentNode->sleep_time);
-        tempNode = rb_next(&currentNode->task_node);
+        tempNode = rb_prev(&currentNode->task_node);
+        i++;
     }
 }
 

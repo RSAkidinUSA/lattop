@@ -5,30 +5,30 @@
 
 /* enqueueing kprobe */
 #define MAX_SYMBOL_LEN	64
-static char symbol_en[MAX_SYMBOL_LEN] = "activate_task";
-module_param_string(symbol_en, symbol_en, sizeof(symbol_en), 0644);
+static char symbol_wake[MAX_SYMBOL_LEN] = "activate_task";
+module_param_string(symbol_wake, symbol_wake, sizeof(symbol_wake), 0644);
 
 
-static struct kprobe kp_en = {
-    .symbol_name    = symbol_en,
+static struct kprobe kp_wake = {
+    .symbol_name    = symbol_wake,
 };
 
 
 /* kprobe pre_handler: called just before the probed instruction is executed */
-static int handler_en_pre(struct kprobe *p, struct pt_regs *regs)
+static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
-    //printk(PRINT_PREF "set_awake: %d\n", set_awake(t_s->pid, time));
+    set_awake(t_s->pid, time);
     return 0;
 }
 
 /* kprobe (post_handler: called after the probed instruction is executed */
-static void handler_en_post(struct kprobe *p, struct pt_regs *regs,
+static void handler_wake_post(struct kprobe *p, struct pt_regs *regs,
 				unsigned long flags)
 {
-    /* printk(PRINT_PREF "kprobe_en_post worked\n"); */
+    /* do nothing */
 }
 
 /*
@@ -36,7 +36,7 @@ static void handler_en_post(struct kprobe *p, struct pt_regs *regs,
  * instruction within the pre- or post-handler, or when Kprobes
  * single-steps the probed instruction.
  */
-static int handler_en_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
+static int handler_wake_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 {
 	printk(PRINT_PREF "fault_en_handler: p->addr = 0x%p, trap #%dn", p->addr, trapnr);
 	/* Return 0 because we don't handle the fault. */
@@ -46,28 +46,28 @@ static int handler_en_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 
 /* dequeueing kprobe */
 
-static char symbol_de[MAX_SYMBOL_LEN] = "deactivate_task";
-module_param_string(symbol_de, symbol_de, sizeof(symbol_de), 0644);
+static char symbol_sleep[MAX_SYMBOL_LEN] = "deactivate_task";
+module_param_string(symbol_sleep, symbol_sleep, sizeof(symbol_sleep), 0644);
 
-static struct kprobe kp_de = {
-    .symbol_name    = symbol_de,
+static struct kprobe kp_sleep = {
+    .symbol_name    = symbol_sleep,
 };
 
 /* kprobe pre_handler: called just before the probed instruction is executed */
-static int handler_de_pre(struct kprobe *p, struct pt_regs *regs)
+static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
 {
-    /* printk(PRINT_PREF "kprobe_de_pre worked\n"); */
-    return 0;
-}
-
-/* kprobe post_handler: called after the probed instruction is executed */
-static void handler_de_post(struct kprobe *p, struct pt_regs *regs,
-				unsigned long flags)
-{
+    int ret;
     struct task_struct *t_s;
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
-    printk(PRINT_PREF "set_asleep: %d\n", set_asleep(t_s->pid, time));
+    ret = set_asleep(t_s->pid, time);
+    return ret;
+}
+
+/* kprobe post_handler: called after the probed instruction is executed */
+static void handler_sleep_post(struct kprobe *p, struct pt_regs *regs,
+				unsigned long flags)
+{
     /* printk(PRINT_PREF "kprobe_de_post worked\n"); */
 }
 
@@ -76,7 +76,7 @@ static void handler_de_post(struct kprobe *p, struct pt_regs *regs,
  * instruction within the pre- or post-handler, or when Kprobes
  * single-steps the probed instruction.
  */
-static int handler_de_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
+static int handler_sleep_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 {
 	printk(PRINT_PREF "fault_de_handler: p->addr = 0x%p, trap #%dn", p->addr, trapnr);
 	/* Return 0 because we don't handle the fault. */
@@ -87,34 +87,34 @@ static int handler_de_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 /* functions for main to call to insert and remove probe */
 int ins_probe(void) {
     int ret;
-    kp_en.pre_handler = handler_en_pre;
-	kp_en.post_handler = handler_en_post;
-	kp_en.fault_handler = handler_en_fault;
+    kp_wake.pre_handler = handler_wake_pre;
+	kp_wake.post_handler = handler_wake_post;
+	kp_wake.fault_handler = handler_wake_fault;
    
-    printk(PRINT_PREF "%s,  %s", symbol_en, symbol_de); 
-    ret = register_kprobe(&kp_en);
+    ret = register_kprobe(&kp_wake);
 	if (ret < 0) {
-		pr_err(PRINT_PREF "register_kprobe_en failed, returned %d\n", ret);
+		pr_err(PRINT_PREF "register_kprobe_wake failed, returned %d\n", ret);
 		return ret;
 	}
-	pr_info(PRINT_PREF "Planted kprobe_en at %p\n", kp_en.addr);
+	pr_info(PRINT_PREF "Planted kprobe_en at %p\n", kp_wake.addr);
     
-    kp_de.pre_handler = handler_de_pre;
-	kp_de.post_handler = handler_de_post;
-	kp_de.fault_handler = handler_de_fault;
+    kp_sleep.pre_handler = handler_sleep_pre;
+	kp_sleep.post_handler = handler_sleep_post;
+	kp_sleep.fault_handler = handler_sleep_fault;
 	
-    ret = register_kprobe(&kp_de);
+    ret = register_kprobe(&kp_sleep);
 	if (ret < 0) {
-		pr_err(PRINT_PREF "register_kprobe_de failed, returned %d\n", ret);
+		pr_err(PRINT_PREF "register_kprobe_sleep failed, returned %d\n", ret);
 		return ret;
 	}
-	pr_info(PRINT_PREF "Planted kprobe_de at %p\n", kp_de.addr);
+	pr_info(PRINT_PREF "Planted kprobe_sleep at %p\n", kp_sleep.addr);
+    
     return 0;
 }
 
 void rm_probe(void) {
-    unregister_kprobe(&kp_en);
-    unregister_kprobe(&kp_de);
-    pr_info("kprobe_en at %p unregistered\n", kp_en.addr);
-    pr_info("kprobe_de at %p unregistered\n", kp_de.addr);
+    unregister_kprobe(&kp_wake);
+    unregister_kprobe(&kp_sleep);
+    pr_info("kprobe_en at %p unregistered\n", kp_wake.addr);
+    pr_info("kprobe_de at %p unregistered\n", kp_sleep.addr);
 }

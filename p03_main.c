@@ -1,24 +1,45 @@
 #include "p03_module.h"
+#include <linux/timer.h>
+
+int g_time_interval = 10000;
+struct timer_list g_timer;
+
+void _TimerHandler(unsigned long data) {
+    /*Restarting the timer...*/
+    mod_timer( &g_timer, jiffies + msecs_to_jiffies(g_time_interval));
+ 
+    print_rb();
+}
 
 static int __init p03_init(void) {
     int ret;
     printk(PRINT_PREF "Latency Profiler Module loaded...\n");
+    /* intialize the red_black tree */
     ret = rb_init();
     if (ret) {
         return ret;
     }
-    /* focus on getting the other functionality working first, then kprobe */
+    /* insert the kprobe */
     ret = ins_probe();
     if (ret) {
         rb_free();
         return ret;
     }
+    
+    /* Start a 10s countdown timer */
+    setup_timer(&g_timer, _TimerHandler, 0);
+    mod_timer( &g_timer, jiffies + msecs_to_jiffies(g_time_interval));
+
+
     return 0;
 }
 
 static void __exit p03_exit(void) {
-    /* focus on getting the other functionality working first, then kprobe */
+    /* stop the timer */
+    del_timer(&g_timer);
+    /* Remove the kprobe */
     rm_probe();
+    /* free the rb tree */
     rb_free();
     printk(PRINT_PREF "Latency module unloaded...\n");
 }

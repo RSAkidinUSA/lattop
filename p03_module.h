@@ -12,7 +12,7 @@ void rm_probe(void);
 
 /* rb tree functions */
 int rb_init(void);
-int set_asleep(pid_t pid, long long time);
-int set_awake(pid_t pid, long long time);
+int set_asleep(pid_t pid, unsigned long long time);
+void set_awake(pid_t pid, unsigned long long time);
 void print_rb(void);
 void rb_free(void);
