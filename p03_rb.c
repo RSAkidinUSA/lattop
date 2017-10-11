@@ -157,13 +157,14 @@ void print_rb(void) {
 /* delete the rb tree when done */
 void rb_free(void) {
     struct rb_node *tempNode;
-    
+    spin_lock(&rb_lock); 
     tempNode = rb_first(&myRoot->tree);
     while (tempNode != NULL) {
         rb_erase(tempNode, &myRoot->tree);
         kfree(rb_entry(tempNode, struct taskNode, task_node));
         tempNode = rb_first(&myRoot->tree);
     }
+    spin_unlock(&rb_lock);
     /* free the root */
     kfree(myRoot);
 }
