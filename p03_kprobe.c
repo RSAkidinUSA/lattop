@@ -13,13 +13,23 @@ static struct kprobe kp_wake = {
     .symbol_name    = symbol_wake,
 };
 
-
 /* kprobe pre_handler: called just before the probed instruction is executed */
 static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
+    /*
+    struct stack_trace s_t;
+    unsigned long entries[STACK_DEPTH];
+    */
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
+    /*
+    s_t.entries = entries;
+    s_t.max_entries = STACK_DEPTH;
+    save_stack_trace(&s_t);
+    printk("Stack for %d (wake):\n", t_s->pid);
+    print_stack_trace(&s_t, 0);
+    */
     set_awake(t_s->pid, time);
     return 0;
 }

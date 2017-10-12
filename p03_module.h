@@ -4,9 +4,10 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/seq_file.h>
+#include <linux/stacktrace.h>
 
+#define STACK_DEPTH 16
 #define PRINT_PREF  KERN_INFO "[lattop]: "
-#define PRINT_DONE  printk(PRINT_PREF "Done.\n")
 
 int ins_probe(void);
 void rm_probe(void);
