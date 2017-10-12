@@ -2,6 +2,7 @@
 #include <linux/rbtree.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/hashtable.h>
 
 static spinlock_t rb_lock;
 
@@ -22,11 +23,15 @@ struct taskRoot {
 /* root of the tree */
 static struct taskRoot *myRoot;
 
+#define ST_HASH_BITS 4
+
 struct taskNode {
     struct rb_node  task_node;
     long long       sleep_time; /* key */
     pid_t           pid;
     long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
+    /* hashtable of stack traces */
+    DECLARE_HASHTABLE(st_ht, ST_HASH_BITS);
 };
 
 /* local functions */
@@ -90,22 +95,24 @@ int rb_init(void) {
 /* check if task in tree, if so, set sleep time */
 /* else create new node and add */
 /* if unable to allocate memory return an error */
-int set_asleep(pid_t pid, unsigned long long time) {
+int set_asleep(struct lat_data *ld) {
     struct taskNode *temp;
     spin_lock(&rb_lock);
-    temp = __searchRB(pid);
+    temp = __searchRB(ld->pid);
     if (temp == NULL) {
         temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
         if (temp == NULL) {
             spin_unlock(&rb_lock);
+            /* should i really do this?? It'll crash the kernel */
             return ENOMEM;
         }
-        temp->pid = pid;
+        hash_init(temp->st_ht);
+        temp->pid = ld->pid;
         temp->sleep_time = 0;
     } else {
         rb_erase(&temp->task_node, &myRoot->tree);
     }
-    temp->start_sleep = time;
+    temp->start_sleep = ld->time;
     __add_node(temp);
     spin_unlock(&rb_lock);
     return 0;
@@ -114,10 +121,10 @@ int set_asleep(pid_t pid, unsigned long long time) {
 /* set awake */
 /* if task not in tree or not sleeping, return */
 /* else set the new sleep time */
-void set_awake(pid_t pid, unsigned long long time) {
+void set_awake(struct lat_data *ld) {
     struct taskNode *temp;
     spin_lock(&rb_lock);
-    temp = __searchRB(pid);
+    temp = __searchRB(ld->pid);
     if (temp == NULL) {
         spin_unlock(&rb_lock);
         return;
@@ -126,7 +133,7 @@ void set_awake(pid_t pid, unsigned long long time) {
         return;
     } else {
         rb_erase(&temp->task_node, &myRoot->tree);
-        temp->sleep_time += (time - temp->start_sleep);
+        temp->sleep_time += (ld->time - temp->start_sleep);
         temp->start_sleep = -1;
         __add_node(temp);
     }

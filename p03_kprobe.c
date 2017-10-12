@@ -17,6 +17,7 @@ static struct kprobe kp_wake = {
 static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
+    struct lat_data ld;
     /*
     struct stack_trace s_t;
     unsigned long entries[STACK_DEPTH];
@@ -30,15 +31,10 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
     printk("Stack for %d (wake):\n", t_s->pid);
     print_stack_trace(&s_t, 0);
     */
-    set_awake(t_s->pid, time);
+    ld.pid = t_s->pid;
+    ld.time = time;
+    set_awake(&ld);
     return 0;
-}
-
-/* kprobe (post_handler: called after the probed instruction is executed */
-static void handler_wake_post(struct kprobe *p, struct pt_regs *regs,
-				unsigned long flags)
-{
-    /* do nothing */
 }
 
 /*
@@ -68,17 +64,13 @@ static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
 {
     int ret;
     struct task_struct *t_s;
+    struct lat_data ld;
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
-    ret = set_asleep(t_s->pid, time);
+    ld.pid = t_s->pid;
+    ld.time = time;
+    ret = set_asleep(&ld);
     return ret;
-}
-
-/* kprobe post_handler: called after the probed instruction is executed */
-static void handler_sleep_post(struct kprobe *p, struct pt_regs *regs,
-				unsigned long flags)
-{
-    /* printk(PRINT_PREF "kprobe_de_post worked\n"); */
 }
 
 /*
@@ -98,7 +90,6 @@ static int handler_sleep_fault(struct kprobe *p, struct pt_regs *regs, int trapn
 int ins_probe(void) {
     int ret;
     kp_wake.pre_handler = handler_wake_pre;
-	kp_wake.post_handler = handler_wake_post;
 	kp_wake.fault_handler = handler_wake_fault;
    
     ret = register_kprobe(&kp_wake);
@@ -109,7 +100,6 @@ int ins_probe(void) {
 	pr_info(PRINT_PREF "Planted kprobe_en at %p\n", kp_wake.addr);
     
     kp_sleep.pre_handler = handler_sleep_pre;
-	kp_sleep.post_handler = handler_sleep_post;
 	kp_sleep.fault_handler = handler_sleep_fault;
 	
     ret = register_kprobe(&kp_sleep);
