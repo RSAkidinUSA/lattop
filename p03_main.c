@@ -8,12 +8,17 @@ void _TimerHandler(unsigned long data) {
     /*Restarting the timer...*/
     mod_timer( &g_timer, jiffies + msecs_to_jiffies(g_time_interval));
  
-    print_rb();
+    /* print_rb(); */
 }
 
 static int __init p03_init(void) {
     int ret;
     printk(PRINT_PREF "Latency Profiler Module loaded...\n");
+    /* open the proc fs */
+    ret = proc_open();
+    if (ret) {
+        return ret;
+    }
     /* intialize the red_black tree */
     ret = rb_init();
     if (ret) {
@@ -41,6 +46,8 @@ static void __exit p03_exit(void) {
     rm_probe();
     /* free the rb tree */
     rb_free();
+    /* close the proc fs */
+    proc_close();
     printk(PRINT_PREF "Latency module unloaded...\n");
 }
 

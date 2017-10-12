@@ -133,6 +133,27 @@ void set_awake(pid_t pid, unsigned long long time) {
     spin_unlock(&rb_lock);
 }
 
+/* print the 1000 longest sleeping processes to /proc */
+void print_rb_proc(struct seq_file *m) {
+    struct rb_node *tempNode;
+    struct taskNode *currentNode;
+    int i = 0;
+
+    tempNode = rb_last(&myRoot->tree);
+
+    seq_printf(m, "Top 1000 highest latency processes:\n");
+    spin_lock(&rb_lock);
+    while (tempNode != NULL && i < 1000) {
+        currentNode = rb_entry(tempNode, struct taskNode, task_node);
+        seq_printf(m, "PID: %-8u Latency: %15llu\n", currentNode->pid, \
+                currentNode->sleep_time);
+        tempNode = rb_prev(&currentNode->task_node);
+        i++;
+    }
+    spin_unlock(&rb_lock);
+
+}
+
 /* print the 1000 longest sleeping processes*/
 void print_rb(void) {
     struct rb_node *tempNode;
