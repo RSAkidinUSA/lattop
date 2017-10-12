@@ -23,17 +23,6 @@ struct taskRoot {
 /* root of the tree */
 static struct taskRoot *myRoot;
 
-#define ST_HASH_BITS 4
-
-struct taskNode {
-    struct rb_node  task_node;
-    long long       sleep_time; /* key */
-    pid_t           pid;
-    long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
-    /* hashtable of stack traces */
-    DECLARE_HASHTABLE(st_ht, ST_HASH_BITS);
-};
-
 /* local functions */
 
 static void __init_taskRoot(struct taskRoot *taskRoot) {

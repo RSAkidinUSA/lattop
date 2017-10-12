@@ -5,8 +5,10 @@
 #include <linux/types.h>
 #include <linux/seq_file.h>
 #include <linux/stacktrace.h>
+#include <linux/hashtable.h>
 
 #define STACK_DEPTH 16
+#define ST_HASH_BITS 4
 #define PRINT_PREF  KERN_INFO "[lattop]: "
 
 /* struct for sharing latency data */
@@ -15,6 +17,16 @@ struct lat_data {
     unsigned long long time;
     struct stack_trace *s_t;
 };
+
+struct taskNode {
+    struct rb_node  task_node;
+    long long       sleep_time; /* key */
+    pid_t           pid;
+    long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
+    /* hashtable of stack traces for this pid */
+    DECLARE_HASHTABLE(st_ht, ST_HASH_BITS);
+};
+
 
 int ins_probe(void);
 void rm_probe(void);

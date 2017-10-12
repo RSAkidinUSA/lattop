@@ -7,7 +7,45 @@
 struct st_slot {
     struct hlist_node hash;
     struct stack_trace *s_t;
+    int sleep_time;
 };
+
+/* hash a stack trace using jhash */
+static u32 __hash_st (struct stack_trace *s_t) {
+    return jhash((void *)s_t->entries, STACK_DEPTH, JHASH_INITVAL);
+}
+
+/* copy stacktrace data from the stack to heap */
+static void __st_copy (struct stack_trace *src, struct stack_trace *dst) {
+    int i = 0;
+    dst->max_entries = STACK_DEPTH;
+    dst->nr_entries = src->nr_entries;
+    for (i = 0; i < STACK_DEPTH; i++) {
+        dst->entries[i] = src->entries[i];
+    }
+}
+
+/* add a trace to the hash table or update it if it exists */
+void add_trace(struct stack_trace *s_t, struct taskNode *tn) {
+    u32 st_hash, temp_hash;
+    struct st_slot *temp_slot;
+    struct stack_trace *temp_st;
+    st_hash = __hash_st(s_t);
+    hash_for_each_possible(tn->st_ht, temp_slot, hash, st_hash) {
+        temp_st = temp_slot->s_t;
+        temp_hash = __hash_st(temp_st);
+        if (temp_hash == st_hash) {
+           /* stack trace is already in the table */ 
+        }
+    }
+    /* stack trace is not in the table  */
+    temp_st = kmalloc(sizeof(*temp_st), GFP_ATOMIC);
+    if (temp_st == NULL) {
+        /* error */
+    }
+    __st_copy(s_t, temp_st);
+
+}
 
 /*
 
