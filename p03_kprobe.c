@@ -8,7 +8,6 @@
 static char symbol_wake[MAX_SYMBOL_LEN] = "activate_task";
 module_param_string(symbol_wake, symbol_wake, sizeof(symbol_wake), 0644);
 
-
 static struct kprobe kp_wake = {
     .symbol_name    = symbol_wake,
 };
@@ -18,21 +17,19 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
     struct lat_data ld;
-    /*
     struct stack_trace s_t;
     unsigned long entries[STACK_DEPTH];
-    */
     long long unsigned time = rdtsc();
+    /* copy task_struct data */
     t_s = (struct task_struct *)regs->si;
-    /*
+    /* save local copy of stack trace, rbtree code will handle copying */
     s_t.entries = entries;
     s_t.max_entries = STACK_DEPTH;
     save_stack_trace(&s_t);
-    printk("Stack for %d (wake):\n", t_s->pid);
-    print_stack_trace(&s_t, 0);
-    */
+    /* set latency data */
     ld.pid = t_s->pid;
     ld.time = time;
+    ld.s_t = &s_t;
     set_awake(&ld);
     return 0;
 }
@@ -97,7 +94,7 @@ int ins_probe(void) {
 		pr_err(PRINT_PREF "register_kprobe_wake failed, returned %d\n", ret);
 		return ret;
 	}
-	pr_info(PRINT_PREF "Planted kprobe_en at %p\n", kp_wake.addr);
+	pr_info(PRINT_PREF "Planted kprobe_wake at %p\n", kp_wake.addr);
     
     kp_sleep.pre_handler = handler_sleep_pre;
 	kp_sleep.fault_handler = handler_sleep_fault;
