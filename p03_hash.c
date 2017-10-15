@@ -5,48 +5,85 @@
 /* Hashtable code */
 
 struct st_slot {
-    struct hlist_node hash;
+    struct hlist_node hash_node;
     struct stack_trace *s_t;
+    u32 hash;
     int sleep_time;
 };
 
 /* hash a stack trace using jhash */
 static u32 __hash_st (struct stack_trace *s_t) {
-    return jhash((void *)s_t->entries, STACK_DEPTH, JHASH_INITVAL);
+    return jhash((void *)s_t->entries, STACK_DEPTH * sizeof(unsigned long), JHASH_INITVAL);
 }
 
-/* copy stacktrace data from the stack to heap */
-static void __st_copy (struct stack_trace *src, struct stack_trace *dst) {
+/* init a new stack trace with data from a given one */
+static struct stack_trace *__init_st(struct stack_trace *src) {
+    struct stack_trace *temp;
     int i = 0;
-    dst->max_entries = STACK_DEPTH;
-    dst->nr_entries = src->nr_entries;
-    for (i = 0; i < STACK_DEPTH; i++) {
-        dst->entries[i] = src->entries[i];
+    temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
+    if (temp == NULL) {
+        return temp;
     }
+    temp->max_entries = STACK_DEPTH;
+    temp->nr_entries = src->nr_entries;
+    for (i = 0; i < STACK_DEPTH; i++) {
+        temp->entries[i] = src->entries[i];
+    }
+    return temp;
 }
 
 /* add a trace to the hash table or update it if it exists */
-void add_trace(struct stack_trace *s_t, struct taskNode *tn) {
-    u32 st_hash, temp_hash;
+void add_trace(struct lat_data *ld, struct taskNode *tn) {
+    u32 st_hash;
+    bool found = false;
     struct st_slot *temp_slot;
     struct stack_trace *temp_st;
-    st_hash = __hash_st(s_t);
-    hash_for_each_possible(tn->st_ht, temp_slot, hash, st_hash) {
-        temp_st = temp_slot->s_t;
-        temp_hash = __hash_st(temp_st);
-        if (temp_hash == st_hash) {
-           /* stack trace is already in the table */ 
+    st_hash = __hash_st(ld->s_t);
+    hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
+        /* stack trace is already in the table */ 
+        if (st_hash == temp_slot->hash) {
+            /* update sleep time for this task */
+            found = true;
+            break;
         }
     }
-    /* stack trace is not in the table  */
-    temp_st = kmalloc(sizeof(*temp_st), GFP_ATOMIC);
-    if (temp_st == NULL) {
-        /* error */
+    if (!found) {
+        /* stack trace is not in the table  */
+        temp_slot = kmalloc(sizeof(*temp_slot), GFP_ATOMIC);
+        if (temp_slot == NULL) {
+            goto no_slot_mem;
+        }
+        temp_st = __init_st(ld->s_t);
+        if (temp_st == NULL) {
+            goto no_st_mem;
+        }
+        temp_slot->sleep_time = 0;
+        temp_slot->s_t = temp_st;
+        temp_slot->hash = st_hash;
+        hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
     }
-    __st_copy(s_t, temp_st);
+    temp_slot->sleep_time += (ld->time - tn->start_sleep);
+
+no_st_mem:
+    kfree(temp_slot);
+no_slot_mem:
+    printk(PRINT_PREF "unable to save stack trace info, no memory left\n");
+    return; 
+
 
 }
 
+/* free the hashtable for a given pid */
+void free_table(struct taskNode *tn) {
+    int bkt;
+    struct st_slot *temp_slot;
+    struct hlist_node *temp;
+    hash_for_each_safe(tn->st_ht, bkt, temp, temp_slot, hash_node) {
+        hash_del(&temp_slot->hash_node);
+        kfree(temp_slot->s_t);
+        kfree(temp_slot);
+    }
+}
 /*
 
 int hash_function(int *int_arr, int len) {

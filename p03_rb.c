@@ -2,7 +2,6 @@
 #include <linux/rbtree.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>
-#include <linux/hashtable.h>
 
 static spinlock_t rb_lock;
 
@@ -123,6 +122,7 @@ void set_awake(struct lat_data *ld) {
     } else {
         rb_erase(&temp->task_node, &myRoot->tree);
         temp->sleep_time += (ld->time - temp->start_sleep);
+        add_trace(ld, temp);
         temp->start_sleep = -1;
         __add_node(temp);
     }
@@ -174,11 +174,14 @@ void print_rb(void) {
 /* delete the rb tree when done */
 void rb_free(void) {
     struct rb_node *tempNode;
+    struct taskNode *tempTask;
     spin_lock(&rb_lock); 
     tempNode = rb_first(&myRoot->tree);
     while (tempNode != NULL) {
         rb_erase(tempNode, &myRoot->tree);
-        kfree(rb_entry(tempNode, struct taskNode, task_node));
+        tempTask = rb_entry(tempNode, struct taskNode, task_node);
+        free_table(tempTask);
+        kfree(tempTask);
         tempNode = rb_first(&myRoot->tree);
     }
     spin_unlock(&rb_lock);

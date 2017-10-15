@@ -33,13 +33,15 @@ void rm_probe(void);
 
 /* rb tree functions */
 int rb_init(void);
-/* int set_asleep(pid_t pid, unsigned long long time); */
 int set_asleep(struct lat_data *ld);
-/* void set_awake(pid_t pid, unsigned long long time); */
 void set_awake(struct lat_data *ld);
 void print_rb(void);
 void print_rb_proc(struct seq_file *m);
 void rb_free(void);
+
+/* hash functions */
+void add_trace(struct lat_data *ld, struct taskNode *tn);
+void free_table(struct taskNode *tn);
 
 /* proc functions */
 int proc_open(void);
