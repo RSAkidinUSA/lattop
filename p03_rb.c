@@ -143,6 +143,7 @@ void print_rb_proc(struct seq_file *m) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
         seq_printf(m, "PID: %-8u Latency: %15llu\n", currentNode->pid, \
                 currentNode->sleep_time);
+        print_table(m, currentNode);
         tempNode = rb_prev(&currentNode->task_node);
         i++;
     }

@@ -8,7 +8,7 @@ struct st_slot {
     struct hlist_node hash_node;
     struct stack_trace *s_t;
     u32 hash;
-    int sleep_time;
+    unsigned long long sleep_time;
 };
 
 /* hash a stack trace using jhash */
@@ -22,13 +22,22 @@ static struct stack_trace *__init_st(struct stack_trace *src) {
     int i = 0;
     temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
     if (temp == NULL) {
-        return temp;
+        goto err_st;
+    }
+    temp->entries = kmalloc(sizeof(unsigned long) * STACK_DEPTH, GFP_ATOMIC);
+    if (temp->entries == NULL) {
+        goto err_entries;
     }
     temp->max_entries = STACK_DEPTH;
     temp->nr_entries = src->nr_entries;
     for (i = 0; i < STACK_DEPTH; i++) {
         temp->entries[i] = src->entries[i];
     }
+    return temp;
+
+err_entries:
+    kfree(temp);
+err_st:
     return temp;
 }
 
@@ -42,7 +51,6 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
     hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
         /* stack trace is already in the table */ 
         if (st_hash == temp_slot->hash) {
-            /* update sleep time for this task */
             found = true;
             break;
         }
@@ -63,6 +71,7 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
     }
     temp_slot->sleep_time += (ld->time - tn->start_sleep);
+    return;
 
 no_st_mem:
     kfree(temp_slot);
@@ -71,6 +80,19 @@ no_slot_mem:
     return; 
 
 
+}
+
+/* print the table of a given task */
+void print_table(struct seq_file *m, struct taskNode *tn) {
+    int bkt;
+    struct st_slot *temp_slot;
+    unsigned long long sum = 0;
+    hash_for_each(tn->st_ht, bkt, temp_slot, hash_node) {
+        seq_printf(m, "Stack trace hash: %8x, Latency: %15llu\n", \
+                temp_slot->hash, temp_slot->sleep_time);
+        sum += temp_slot->sleep_time;
+    }
+    seq_printf(m, "Total latency: %llu\n", sum);
 }
 
 /* free the hashtable for a given pid */
