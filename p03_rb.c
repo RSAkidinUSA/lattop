@@ -139,7 +139,7 @@ void print_rb_proc(struct seq_file *m) {
 
     seq_printf(m, "Top 1000 highest latency processes:\n");
     spin_lock(&rb_lock);
-    while (tempNode != NULL && i < 1000) {
+    while (tempNode != NULL && i < 2) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
         seq_printf(m, "PID: %-8u Latency: %15llu\n", currentNode->pid, \
                 currentNode->sleep_time);

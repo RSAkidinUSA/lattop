@@ -17,15 +17,19 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
     struct lat_data ld;
-    struct stack_trace s_t;
     unsigned long entries[STACK_DEPTH];
+    struct stack_trace s_t = {
+        .nr_entries = 0,
+        .entries = &entries[0],
+        
+        .max_entries = STACK_DEPTH,
+        .skip = 0
+    };
     long long unsigned time = rdtsc();
     /* copy task_struct data */
     t_s = (struct task_struct *)regs->si;
     /* save local copy of stack trace, rbtree code will handle copying */
-    s_t.entries = entries;
-    s_t.max_entries = STACK_DEPTH;
-    save_stack_trace(&s_t);
+    save_stack_trace_tsk(t_s, &s_t);
     /* set latency data */
     ld.pid = t_s->pid;
     ld.time = time;
@@ -41,7 +45,7 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
  */
 static int handler_wake_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 {
-	printk(PRINT_PREF "fault_en_handler: p->addr = 0x%p, trap #%dn", p->addr, trapnr);
+	printk(PRINT_PREF "fault_wake_handler: p->addr = 0x%p, trap #%dn", p->addr, trapnr);
 	/* Return 0 because we don't handle the fault. */
 	return 0;
 }

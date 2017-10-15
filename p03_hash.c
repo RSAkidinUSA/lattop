@@ -62,6 +62,8 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
             goto no_slot_mem;
         }
         temp_st = __init_st(ld->s_t);
+        /* print_stack_trace(ld->s_t, 0); */
+        /* print_stack_trace(temp_st, 0); */
         if (temp_st == NULL) {
             goto no_st_mem;
         }
@@ -82,17 +84,32 @@ no_slot_mem:
 
 }
 
+static void __seqprint_stack_trace(struct seq_file *m, struct stack_trace *trace) {
+    int i;
+
+    if (WARN_ON(!trace->entries)) {
+        return;
+    }
+
+    for (i = 0; i < trace->nr_entries; i++) {
+        seq_printf(m, "%*c%ps\n", 1, ' ', (void *)trace->entries[i]);
+    }
+}
+
 /* print the table of a given task */
-void print_table(struct seq_file *m, struct taskNode *tn) {
+int print_table(struct seq_file *m, struct taskNode *tn) {
     int bkt;
     struct st_slot *temp_slot;
     unsigned long long sum = 0;
+    int counter = 0;
     hash_for_each(tn->st_ht, bkt, temp_slot, hash_node) {
         seq_printf(m, "Stack trace hash: %8x, Latency: %15llu\n", \
                 temp_slot->hash, temp_slot->sleep_time);
+        __seqprint_stack_trace(m, temp_slot->s_t);
         sum += temp_slot->sleep_time;
+        counter++;
     }
-    seq_printf(m, "Total latency: %llu\n", sum);
+    return counter;
 }
 
 /* free the hashtable for a given pid */
@@ -106,63 +123,3 @@ void free_table(struct taskNode *tn) {
         kfree(temp_slot);
     }
 }
-/*
-
-int hash_function(int *int_arr, int len) {
-    int i, bkt;
-    struct int_slot *int_slot;
-    struct hlist_node *temp;
-    
-    // create the hashtable
-    printk(PRINT_PREF "Creating the hashtable.\n");
-    hash_init(int_slots_hash);
-
-    // add values to the hash table
-    printk(PRINT_PREF "Adding values to the hashtable.\n");
-    for (i = 0; i < len; i++) {
-        struct int_slot *temp = kmalloc(sizeof(*temp), GFP_KERNEL);
-        if (temp == NULL) {
-            return -ENOMEM;
-        }
-        temp->val = int_arr[i];
-        hash_add(int_slots_hash, &temp->hash, temp->val);
-    }
-
-    // print all values in the hashtable
-    printk(PRINT_PREF "Iterating the hashtable:\n");
-    hash_for_each(int_slots_hash, bkt, int_slot, hash) {
-        printk(PRINT_PREF "%d\n", int_slot->val);
-    }
-    PRINT_DONE;
-
-    // Look up each number in hash table
-    printk(PRINT_PREF "Looking up inserted numbers:\n");
-    for (i = 0; i < len; i++) {
-        hash_for_each_possible(int_slots_hash, int_slot, hash, int_arr[i]) {
-            if(int_arr[i] == int_slot->val) {
-                printk(PRINT_PREF "Input:%d, Hashed:%d\n", int_arr[i], \
-                        int_slot->val);
-            }
-        }
-    }
-    PRINT_DONE;
-
-    // delete all items in the hashtable
-    printk(PRINT_PREF "Deleting the objects in the hashtable.\n");
-    hash_for_each_safe(int_slots_hash, bkt, temp, int_slot, hash) {
-        hash_del(&int_slot->hash);
-        kfree(int_slot);
-    }
-
-    // iterate the empty has table
-    // same code as before, but hashtable should be empty now
-    printk(PRINT_PREF "Iterating the hashtable:\n");
-    hash_for_each(int_slots_hash, bkt, int_slot, hash) {
-        printk(PRINT_PREF "%d\n", int_slot->val);
-    }
-    PRINT_DONE;
-
-    return 0;
-}
-
-*/
