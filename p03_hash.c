@@ -124,7 +124,9 @@ static void __seqprint_stack_trace(struct seq_file *m, struct stack_trace *trace
     }
 
     for (i = 0; i < trace->nr_entries; i++) {
-        seq_printf(m, "%*c%pS\n", 1, ' ', (void *)trace->entries[i]);
+        if (trace->entries[i] != ULONG_MAX) {
+            seq_printf(m, "%*c%pS\n", 1, ' ', (void *)trace->entries[i]);
+        }
     }
 }
 
@@ -141,7 +143,7 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
         }
     }
     if (high_lat != NULL) {
-        seq_printf(m, "Max stack trace latency: %15llu\n", \
+        seq_printf(m, "Max stack trace latency: %-15llu\n", \
                 high_lat->sleep_time);
         __seqprint_stack_trace(m, high_lat->s_t);
         seq_printf(m, "\n");

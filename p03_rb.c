@@ -146,7 +146,7 @@ void print_rb_proc(struct seq_file *m) {
             /* once a sleep time of zero is reached, exit */
             break;
         }
-        seq_printf(m, "PID: %u, COMM: %s, Latency: %-15llu\n", \
+        seq_printf(m, "PID: %u, comm: %s, Latency: %-15llu\n", \
                 currentNode->pid, currentNode->name, \
                 currentNode->sleep_time);
         print_table(m, currentNode);
