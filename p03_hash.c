@@ -129,20 +129,23 @@ static void __seqprint_stack_trace(struct seq_file *m, struct stack_trace *trace
 }
 
 /* print the table of a given task */
-int print_table(struct seq_file *m, struct taskNode *tn) {
+void print_table(struct seq_file *m, struct taskNode *tn) {
     int bkt;
-    struct st_slot *temp_slot;
-    unsigned long long sum = 0;
-    int counter = 0;
+    struct st_slot *temp_slot, *high_lat;
+    high_lat = NULL;
     hash_for_each(tn->st_ht, bkt, temp_slot, hash_node) {
-        seq_printf(m, "Stack trace hash: %8x, Latency: %15llu\n", \
-                temp_slot->hash, temp_slot->sleep_time);
-        __seqprint_stack_trace(m, temp_slot->s_t);
-        seq_printf(m, "\n");
-        sum += temp_slot->sleep_time;
-        counter++;
+        if (high_lat == NULL) {
+            high_lat = temp_slot;
+        } else if (high_lat->sleep_time < temp_slot->sleep_time) {
+            high_lat = temp_slot;
+        }
     }
-    return counter;
+    if (high_lat != NULL) {
+        seq_printf(m, "Max stack trace latency: %15llu\n", \
+                high_lat->sleep_time);
+        __seqprint_stack_trace(m, high_lat->s_t);
+        seq_printf(m, "\n");
+    }
 }
 
 /* free the hashtable for a given pid */

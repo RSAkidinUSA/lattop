@@ -46,7 +46,7 @@ void rb_free(void);
 /* hash functions */
 void add_trace(struct lat_data *ld, struct taskNode *tn);
 void free_table(struct taskNode *tn);
-int print_table(struct seq_file *m, struct taskNode *tn);
+void print_table(struct seq_file *m, struct taskNode *tn);
 
 /* proc functions */
 int proc_open(void);

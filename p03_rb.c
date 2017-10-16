@@ -142,10 +142,14 @@ void print_rb_proc(struct seq_file *m) {
     spin_lock(&rb_lock);
     while (tempNode != NULL && i < 1000) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
-        seq_printf(m, "PID: %-8u, Name: %15s, Latency: %15llu\n", \
+        if (currentNode->sleep_time == 0) {
+            /* once a sleep time of zero is reached, exit */
+            break;
+        }
+        seq_printf(m, "PID: %u, COMM: %s, Latency: %-15llu\n", \
                 currentNode->pid, currentNode->name, \
                 currentNode->sleep_time);
-        i += print_table(m, currentNode);
+        print_table(m, currentNode);
         tempNode = rb_prev(&currentNode->task_node);
     }
     spin_unlock(&rb_lock);
