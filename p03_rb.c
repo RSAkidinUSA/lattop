@@ -95,6 +95,7 @@ int set_asleep(struct lat_data *ld) {
             return ENOMEM;
         }
         hash_init(temp->st_ht);
+        strncpy(temp->name, ld->name, TASK_COMM_LEN);
         temp->pid = ld->pid;
         temp->sleep_time = 0;
     } else {
@@ -139,13 +140,13 @@ void print_rb_proc(struct seq_file *m) {
 
     seq_printf(m, "Top 1000 highest latency processes:\n");
     spin_lock(&rb_lock);
-    while (tempNode != NULL && i < 2) {
+    while (tempNode != NULL && i < 1000) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
-        seq_printf(m, "PID: %-8u Latency: %15llu\n", currentNode->pid, \
+        seq_printf(m, "PID: %-8u, Name: %15s, Latency: %15llu\n", \
+                currentNode->pid, currentNode->name, \
                 currentNode->sleep_time);
-        print_table(m, currentNode);
+        i += print_table(m, currentNode);
         tempNode = rb_prev(&currentNode->task_node);
-        i++;
     }
     spin_unlock(&rb_lock);
 

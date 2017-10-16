@@ -11,9 +11,43 @@ struct st_slot {
     unsigned long long sleep_time;
 };
 
+/* custom snprint_stack_trace to ignore function offsets */
+static int __snprint_stack_trace(char *buf, size_t size,
+			struct stack_trace *trace, int spaces)
+{
+	int i;
+	int generated;
+	int total = 0;
+
+	if (WARN_ON(!trace->entries))
+		return 0;
+
+	for (i = 0; i < trace->nr_entries; i++) {
+		generated = snprintf(buf, size, "%*c%ps\n", 1 + spaces, ' ',
+				     (void *)trace->entries[i]);
+
+		total += generated;
+
+		/* Assume that generated isn't a negative number */
+		if (generated >= size) {
+			buf += size;
+			size = 0;
+		} else {
+			buf += generated;
+			size -= generated;
+		}
+	}
+
+	return total;
+}
+
+#define __BUF_SIZE 1024
 /* hash a stack trace using jhash */
 static u32 __hash_st (struct stack_trace *s_t) {
-    return jhash((void *)s_t->entries, STACK_DEPTH * sizeof(unsigned long), JHASH_INITVAL);
+    int buflen;
+    char buf[__BUF_SIZE];
+    buflen = __snprint_stack_trace(buf, __BUF_SIZE, s_t, 0);
+    return jhash((void *)buf, buflen * sizeof(char), JHASH_INITVAL);
 }
 
 /* init a new stack trace with data from a given one */
@@ -62,8 +96,6 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
             goto no_slot_mem;
         }
         temp_st = __init_st(ld->s_t);
-        /* print_stack_trace(ld->s_t, 0); */
-        /* print_stack_trace(temp_st, 0); */
         if (temp_st == NULL) {
             goto no_st_mem;
         }
@@ -92,7 +124,7 @@ static void __seqprint_stack_trace(struct seq_file *m, struct stack_trace *trace
     }
 
     for (i = 0; i < trace->nr_entries; i++) {
-        seq_printf(m, "%*c%ps\n", 1, ' ', (void *)trace->entries[i]);
+        seq_printf(m, "%*c%pS\n", 1, ' ', (void *)trace->entries[i]);
     }
 }
 
@@ -106,6 +138,7 @@ int print_table(struct seq_file *m, struct taskNode *tn) {
         seq_printf(m, "Stack trace hash: %8x, Latency: %15llu\n", \
                 temp_slot->hash, temp_slot->sleep_time);
         __seqprint_stack_trace(m, temp_slot->s_t);
+        seq_printf(m, "\n");
         sum += temp_slot->sleep_time;
         counter++;
     }

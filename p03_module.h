@@ -6,6 +6,8 @@
 #include <linux/seq_file.h>
 #include <linux/stacktrace.h>
 #include <linux/hashtable.h>
+#include <linux/sched.h>
+#include <linux/string.h>
 
 #define STACK_DEPTH 16
 #define ST_HASH_BITS 4
@@ -14,6 +16,7 @@
 /* struct for sharing latency data */
 struct lat_data {
     pid_t pid;
+    char name[TASK_COMM_LEN];
     unsigned long long time;
     struct stack_trace *s_t;
 };
@@ -22,6 +25,7 @@ struct taskNode {
     struct rb_node  task_node;
     long long       sleep_time; /* key */
     pid_t           pid;
+    char            name[TASK_COMM_LEN];
     long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
     /* hashtable of stack traces for this pid */
     DECLARE_HASHTABLE(st_ht, ST_HASH_BITS);

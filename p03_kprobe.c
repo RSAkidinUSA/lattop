@@ -1,7 +1,6 @@
 #include "p03_module.h"
 #include <linux/kprobes.h>
 #include <config/x86/tsc.h>
-#include <linux/sched.h>
 
 /* enqueueing kprobe */
 #define MAX_SYMBOL_LEN	64
@@ -69,6 +68,7 @@ static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
     ld.pid = t_s->pid;
+    strncpy(ld.name, t_s->comm, TASK_COMM_LEN);
     ld.time = time;
     ret = set_asleep(&ld);
     return ret;
