@@ -6,7 +6,7 @@
 
 struct st_slot {
     struct hlist_node hash_node;
-    struct stack_trace *s_t;
+    struct stack_trace *s_t, *s_t_user;
     u32 hash;
     unsigned long long sleep_time;
 };
@@ -80,7 +80,7 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
     u32 st_hash;
     bool found = false;
     struct st_slot *temp_slot;
-    struct stack_trace *temp_st;
+    struct stack_trace *temp_st, *temp_st_user;
     st_hash = __hash_st(ld->s_t);
     hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
         /* stack trace is already in the table */ 
@@ -99,14 +99,21 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
         if (temp_st == NULL) {
             goto no_st_mem;
         }
+        temp_st_user = __init_st(ld->s_t_user);
+        if (temp_st_user == NULL) {
+            goto no_st_user_mem;
+        }
         temp_slot->sleep_time = 0;
         temp_slot->s_t = temp_st;
+        temp_slot->s_t_user = temp_st_user;
         temp_slot->hash = st_hash;
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
     }
     temp_slot->sleep_time += (ld->time - tn->start_sleep);
     return;
 
+no_st_user_mem:
+    kfree(temp_st);
 no_st_mem:
     kfree(temp_slot);
 no_slot_mem:
@@ -145,7 +152,10 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
     if (high_lat != NULL) {
         seq_printf(m, "Max stack trace latency: %-15llu\n", \
                 high_lat->sleep_time);
+        seq_printf(m, "Kernel stack trace:\n");
         __seqprint_stack_trace(m, high_lat->s_t);
+        seq_printf(m, "User stack trace:\n");
+        __seqprint_stack_trace(m, high_lat->s_t_user);
         seq_printf(m, "\n");
     }
 }
@@ -158,6 +168,7 @@ void free_table(struct taskNode *tn) {
     hash_for_each_safe(tn->st_ht, bkt, temp, temp_slot, hash_node) {
         hash_del(&temp_slot->hash_node);
         kfree(temp_slot->s_t);
+        kfree(temp_slot->s_t_user);
         kfree(temp_slot);
     }
 }
