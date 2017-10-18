@@ -8,6 +8,7 @@
 #include <linux/hashtable.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/spinlock.h>
 
 #define STACK_DEPTH 16
 #define ST_HASH_BITS 4
@@ -39,7 +40,6 @@ void rm_probe(void);
 int rb_init(void);
 int set_asleep(struct lat_data *ld);
 void set_awake(struct lat_data *ld);
-void print_rb(void);
 void print_rb_proc(struct seq_file *m);
 void rb_free(void);
 

@@ -35,10 +35,11 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
     /* copy task_struct data */
     t_s = (struct task_struct *)regs->si;
     /* save local copy of stack trace, rbtree code will handle copying */
-    save_stack_trace_tsk(t_s, &s_t);
+    //save_stack_trace_tsk(t_s, &s_t);
+    save_stack_trace(&s_t);
     /* can't use this function cause it's not exported... try making our own */
-    /* save_stack_trace_user(&s_t_user); */
-    save_stack_trace(&s_t_user);
+    save_stack_trace_user(&s_t_user);
+    /* save_stack_trace(&s_t_user); */
     /* set latency data */
     ld.pid = t_s->pid;
     ld.time = time;
