@@ -28,6 +28,7 @@ static void __init_taskRoot(struct taskRoot *taskRoot) {
 }
 
 /* add a node to the lat tree return false if unable to insert */
+
 static bool __add_node_l(struct taskNode *tn) {
     struct rb_node **link = &latRoot->tree.rb_node;
     struct rb_node *parent = NULL;
@@ -63,6 +64,8 @@ static bool __add_node_l(struct taskNode *tn) {
     return valid;
 }
 
+/* add a node to the pid rb tree */
+
 static void __add_node_p(struct taskNode *tn)  {
     struct rb_node **link = &pidRoot->tree.rb_node;
     struct rb_node *parent = NULL;
@@ -78,7 +81,7 @@ static void __add_node_p(struct taskNode *tn)  {
             link = &parent->rb_right;
         } else {
             /* error */
-            printk(PRINT_PREF "Error inserting task with the same pid\n");
+            printk(PRINT_PREF "Error inserting task with the same pid: %d\n", tn->pid);
             write_unlock(&rb_lock);
             return;
         }
@@ -95,17 +98,20 @@ static struct taskNode *__searchRB(pid_t pid) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
 
-    tempNode = rb_first(&latRoot->tree);
+    tempNode = pidRoot->tree.rb_node;
     read_lock(&rb_lock);
     while (tempNode != NULL) {
-        currentNode = rb_entry(tempNode, struct taskNode, lat_node);
-        if (currentNode->pid == pid) {
+        currentNode = rb_entry(tempNode, struct taskNode, pid_node);
+        if (pid < currentNode->pid) {
+            tempNode = tempNode->rb_left;
+        } else if (pid > currentNode->pid) {
+            tempNode = tempNode->rb_right;
+        } else {
             break;
         }
-        tempNode = rb_next(&currentNode->lat_node);
     }
     read_unlock(&rb_lock);
-    return (tempNode == NULL) ? NULL : currentNode;
+    return (tempNode == NULL) ? NULL: currentNode;
 }
 
 /* functions accessible by other files */
@@ -152,6 +158,7 @@ int set_asleep(struct lat_data *ld) {
         strncpy(temp->name, ld->name, TASK_COMM_LEN);
         temp->pid = ld->pid;
         temp->sleep_time = 0;
+        __add_node_p(temp);
     } else {
         write_lock(&rb_lock);
         rb_erase(&temp->lat_node, &latRoot->tree);
