@@ -1,6 +1,9 @@
 #include "p03_module.h"
 #include <linux/hashtable.h>
 #include <linux/jhash.h>
+#include <linux/spinlock.h>
+
+DEFINE_RWLOCK(hash_lock);
 
 /* Hashtable code */
 
@@ -82,6 +85,7 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
     struct st_slot *temp_slot;
     struct stack_trace *temp_st, *temp_st_user;
     st_hash = __hash_st(ld->s_t);
+    read_lock(&hash_lock);
     hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
         /* stack trace is already in the table */ 
         if (st_hash == temp_slot->hash) {
@@ -89,6 +93,7 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
             break;
         }
     }
+    read_unlock(&hash_lock);
     if (!found) {
         /* stack trace is not in the table  */
         temp_slot = kmalloc(sizeof(*temp_slot), GFP_ATOMIC);
@@ -107,7 +112,9 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
         temp_slot->s_t = temp_st;
         temp_slot->s_t_user = temp_st_user;
         temp_slot->hash = st_hash;
+        write_lock(&hash_lock);
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
+        write_unlock(&hash_lock);
     }
     temp_slot->sleep_time += (ld->time - tn->start_sleep);
     return;
@@ -142,6 +149,7 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
     int bkt;
     struct st_slot *temp_slot, *high_lat;
     high_lat = NULL;
+    read_lock(&hash_lock);
     hash_for_each(tn->st_ht, bkt, temp_slot, hash_node) {
         if (high_lat == NULL) {
             high_lat = temp_slot;
@@ -149,6 +157,7 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
             high_lat = temp_slot;
         }
     }
+    read_unlock(&hash_lock);
     if (high_lat != NULL) {
         seq_printf(m, "Max stack trace latency: %-15llu\n", \
                 high_lat->sleep_time);
@@ -165,10 +174,12 @@ void free_table(struct taskNode *tn) {
     int bkt;
     struct st_slot *temp_slot;
     struct hlist_node *temp;
+    write_lock(&hash_lock);
     hash_for_each_safe(tn->st_ht, bkt, temp, temp_slot, hash_node) {
         hash_del(&temp_slot->hash_node);
         kfree(temp_slot->s_t);
         kfree(temp_slot->s_t_user);
         kfree(temp_slot);
     }
+    write_unlock(&hash_lock);
 }
