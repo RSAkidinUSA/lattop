@@ -1,7 +1,6 @@
 #include "p03_module.h"
 #include <linux/rbtree.h>
 #include <linux/types.h>
-#include <linux/spinlock.h>
 
 DEFINE_RWLOCK(rb_lock);
 
@@ -40,8 +39,16 @@ static void __add_node(struct taskNode *tn) {
         entry = rb_entry(parent, struct taskNode, task_node);
         if (tn->sleep_time < entry->sleep_time) {
             link = &parent->rb_left;
-        } else {
+        } else if (tn->sleep_time > entry->sleep_time) {
             link = &parent->rb_right;
+        } else {
+            /* if sleep times are equal, use offsets */
+            if (tn->offset < entry->offset) {
+                link = &parent->rb_left;
+            } else {
+                link = &parent->rb_right;
+                tn->offset++;
+            }
         }
     }
 
@@ -104,6 +111,7 @@ int set_asleep(struct lat_data *ld) {
         write_unlock(&rb_lock);
     }
     temp->start_sleep = ld->time;
+    temp->offset = 0;
     __add_node(temp);
     return 0;
 }
@@ -125,6 +133,7 @@ void set_awake(struct lat_data *ld) {
         temp->sleep_time += (ld->time - temp->start_sleep);
         add_trace(ld, temp);
         temp->start_sleep = -1;
+        temp->offset = 0;
         __add_node(temp);
     }
 }

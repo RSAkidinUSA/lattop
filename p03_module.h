@@ -25,6 +25,7 @@ struct lat_data {
 struct taskNode {
     struct rb_node  task_node;
     long long       sleep_time; /* key */
+    int             offset; /* offset for key matches */
     pid_t           pid;
     char            name[TASK_COMM_LEN];
     long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
