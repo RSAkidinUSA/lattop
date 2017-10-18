@@ -27,12 +27,12 @@ static void __init_taskRoot(struct taskRoot *taskRoot) {
     taskRoot->tree = RB_ROOT;
 }
 
-/* add a node to the tree */
-static void __add_node(struct taskNode *tn) {
+/* add a node to the lat tree */
+static void __add_node_l(struct taskNode *tn) {
     struct rb_node **link = &latRoot->tree.rb_node;
     struct rb_node *parent = NULL;
     struct taskNode *entry;
-    
+    /* add node to the latency rb tree */ 
     write_lock(&rb_lock);
     while (*link) {
         parent = *link;
@@ -51,9 +51,36 @@ static void __add_node(struct taskNode *tn) {
             }
         }
     }
-
     rb_link_node(&tn->lat_node, parent, link);
     rb_insert_color(&tn->lat_node, &latRoot->tree);
+
+    write_unlock(&rb_lock);
+}
+
+static void __add_node_p(struct taskNode *tn)  {
+    struct rb_node **link = &pidRoot->tree.rb_node;
+    struct rb_node *parent = NULL;
+    struct taskNode *entry;
+    /* add node to the latency rb tree */ 
+    write_lock(&rb_lock);
+    while (*link) {
+        parent = *link;
+        entry = rb_entry(parent, struct taskNode, pid_node);
+        if (tn->pid < entry->pid) {
+            link = &parent->rb_left;
+        } else if (tn->pid > entry->pid) {
+            link = &parent->rb_right;
+        } else {
+            /* error */
+            printk(PRINT_PREF "Error inserting task with the same pid\n");
+            write_unlock(&rb_lock);
+            return;
+        }
+    }
+
+    rb_link_node(&tn->pid_node, parent, link);
+    rb_insert_color(&tn->pid_node, &pidRoot->tree);
+
     write_unlock(&rb_lock);
 }
 
@@ -79,13 +106,26 @@ static struct taskNode *__searchRB(pid_t pid) {
 
 /* initialize the rb tree */
 int rb_init(void) {
-    /* create the RB tree */
+    /* create the latency RB tree */
     latRoot = kmalloc(sizeof(*latRoot), GFP_KERNEL);
     if (latRoot == NULL) {
-        return ENOMEM;
+        goto lat_err;
     }
+    /* create the pid RB tree */
+    pidRoot = kmalloc(sizeof(*latRoot), GFP_KERNEL);
+    if (pidRoot == NULL) {
+        goto pid_err;
+    }
+
+    
     __init_taskRoot(latRoot);
+    __init_taskRoot(pidRoot);
     return 0;  
+
+pid_err:
+    kfree(latRoot);
+lat_err:
+    return ENOMEM;
 }
 
 /* set asleep */
@@ -112,7 +152,7 @@ int set_asleep(struct lat_data *ld) {
     }
     temp->start_sleep = ld->time;
     temp->offset = 0;
-    __add_node(temp);
+    __add_node_l(temp);
     return 0;
 }
 
@@ -134,7 +174,7 @@ void set_awake(struct lat_data *ld) {
         add_trace(ld, temp);
         temp->start_sleep = -1;
         temp->offset = 0;
-        __add_node(temp);
+        __add_node_l(temp);
     }
 }
 
@@ -170,7 +210,16 @@ void print_rb_proc(struct seq_file *m) {
 void rb_free(void) {
     struct rb_node *tempNode;
     struct taskNode *tempTask;
-    write_lock(&rb_lock); 
+    write_lock(&rb_lock);
+    
+    /* free pid rb tree */
+    tempNode = rb_first(&pidRoot->tree);
+    while (tempNode != NULL) {
+        rb_erase(tempNode, &pidRoot->tree);
+        tempNode = rb_first(&pidRoot->tree);
+    }
+
+    /* free lat rb tree */ 
     tempNode = rb_first(&latRoot->tree);
     while (tempNode != NULL) {
         rb_erase(tempNode, &latRoot->tree);
@@ -179,8 +228,10 @@ void rb_free(void) {
         kfree(tempTask);
         tempNode = rb_first(&latRoot->tree);
     }
+    
     write_unlock(&rb_lock);
     /* free the root */
     kfree(latRoot);
+    kfree(pidRoot);
 }
 
