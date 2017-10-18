@@ -3,7 +3,7 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 
-static spinlock_t rb_lock;
+DEFINE_RWLOCK(rb_lock);
 
 /* tree usage is as follows: */
 /* init the tree */
@@ -33,7 +33,8 @@ static void __add_node(struct taskNode *tn) {
     struct rb_node **link = &myRoot->tree.rb_node;
     struct rb_node *parent = NULL;
     struct taskNode *entry;
-
+    
+    write_lock(&rb_lock);
     while (*link) {
         parent = *link;
         entry = rb_entry(parent, struct taskNode, task_node);
@@ -46,6 +47,7 @@ static void __add_node(struct taskNode *tn) {
 
     rb_link_node(&tn->task_node, parent, link);
     rb_insert_color(&tn->task_node, &myRoot->tree);
+    write_unlock(&rb_lock);
 }
 
 /* search tree for a node with a given PID */
@@ -54,15 +56,16 @@ static struct taskNode *__searchRB(pid_t pid) {
     struct taskNode *currentNode;
 
     tempNode = rb_first(&myRoot->tree);
-
+    read_lock(&rb_lock);
     while (tempNode != NULL) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
         if (currentNode->pid == pid) {
-            return currentNode;
+            break;
         }
         tempNode = rb_next(&currentNode->task_node);
     }
-    return NULL;
+    read_unlock(&rb_lock);
+    return (tempNode == NULL) ? NULL : currentNode;
 }
 
 /* functions accessible by other files */
@@ -74,7 +77,6 @@ int rb_init(void) {
     if (myRoot == NULL) {
         return ENOMEM;
     }
-    spin_lock_init(&rb_lock);
     __init_taskRoot(myRoot);
     return 0;  
 }
@@ -85,12 +87,10 @@ int rb_init(void) {
 /* if unable to allocate memory return an error */
 int set_asleep(struct lat_data *ld) {
     struct taskNode *temp;
-    spin_lock(&rb_lock);
     temp = __searchRB(ld->pid);
     if (temp == NULL) {
         temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
         if (temp == NULL) {
-            spin_unlock(&rb_lock);
             /* should i really do this?? It'll crash the kernel */
             return ENOMEM;
         }
@@ -99,11 +99,12 @@ int set_asleep(struct lat_data *ld) {
         temp->pid = ld->pid;
         temp->sleep_time = 0;
     } else {
+        write_lock(&rb_lock);
         rb_erase(&temp->task_node, &myRoot->tree);
+        write_unlock(&rb_lock);
     }
     temp->start_sleep = ld->time;
     __add_node(temp);
-    spin_unlock(&rb_lock);
     return 0;
 }
 
@@ -112,22 +113,20 @@ int set_asleep(struct lat_data *ld) {
 /* else set the new sleep time */
 void set_awake(struct lat_data *ld) {
     struct taskNode *temp;
-    spin_lock(&rb_lock);
     temp = __searchRB(ld->pid);
     if (temp == NULL) {
-        spin_unlock(&rb_lock);
         return;
     } else if (temp->start_sleep  == -1) {
-        spin_unlock(&rb_lock);
         return;
     } else {
+        write_lock(&rb_lock);
         rb_erase(&temp->task_node, &myRoot->tree);
+        write_unlock(&rb_lock);
         temp->sleep_time += (ld->time - temp->start_sleep);
         add_trace(ld, temp);
         temp->start_sleep = -1;
         __add_node(temp);
     }
-    spin_unlock(&rb_lock);
 }
 
 /* print the 1000 longest sleeping processes to /proc */
@@ -135,11 +134,12 @@ void print_rb_proc(struct seq_file *m) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
     int i = 0;
+    unsigned long flags;
 
     tempNode = rb_last(&myRoot->tree);
 
     seq_printf(m, "Top 1000 highest latency processes:\n");
-    spin_lock(&rb_lock);
+    read_lock_irqsave(&rb_lock, flags);
     while (tempNode != NULL && i < 1000) {
         currentNode = rb_entry(tempNode, struct taskNode, task_node);
         if (currentNode->sleep_time == 0) {
@@ -152,11 +152,12 @@ void print_rb_proc(struct seq_file *m) {
         print_table(m, currentNode);
         tempNode = rb_prev(&currentNode->task_node);
     }
-    spin_unlock(&rb_lock);
+    read_unlock_irqrestore(&rb_lock, flags);
 
 }
 
 /* print the 1000 longest sleeping processes*/
+/*
 void print_rb(void) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
@@ -175,13 +176,14 @@ void print_rb(void) {
     }
     spin_unlock(&rb_lock);
 }
+*/
 
 
 /* delete the rb tree when done */
 void rb_free(void) {
     struct rb_node *tempNode;
     struct taskNode *tempTask;
-    spin_lock(&rb_lock); 
+    write_lock(&rb_lock); 
     tempNode = rb_first(&myRoot->tree);
     while (tempNode != NULL) {
         rb_erase(tempNode, &myRoot->tree);
@@ -190,7 +192,7 @@ void rb_free(void) {
         kfree(tempTask);
         tempNode = rb_first(&myRoot->tree);
     }
-    spin_unlock(&rb_lock);
+    write_unlock(&rb_lock);
     /* free the root */
     kfree(myRoot);
 }
