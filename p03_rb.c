@@ -19,7 +19,7 @@ struct taskRoot {
 };
 
 /* root of the tree */
-static struct taskRoot *myRoot;
+static struct taskRoot *latRoot, *pidRoot;
 
 /* local functions */
 
@@ -29,14 +29,14 @@ static void __init_taskRoot(struct taskRoot *taskRoot) {
 
 /* add a node to the tree */
 static void __add_node(struct taskNode *tn) {
-    struct rb_node **link = &myRoot->tree.rb_node;
+    struct rb_node **link = &latRoot->tree.rb_node;
     struct rb_node *parent = NULL;
     struct taskNode *entry;
     
     write_lock(&rb_lock);
     while (*link) {
         parent = *link;
-        entry = rb_entry(parent, struct taskNode, task_node);
+        entry = rb_entry(parent, struct taskNode, lat_node);
         if (tn->sleep_time < entry->sleep_time) {
             link = &parent->rb_left;
         } else if (tn->sleep_time > entry->sleep_time) {
@@ -52,8 +52,8 @@ static void __add_node(struct taskNode *tn) {
         }
     }
 
-    rb_link_node(&tn->task_node, parent, link);
-    rb_insert_color(&tn->task_node, &myRoot->tree);
+    rb_link_node(&tn->lat_node, parent, link);
+    rb_insert_color(&tn->lat_node, &latRoot->tree);
     write_unlock(&rb_lock);
 }
 
@@ -62,14 +62,14 @@ static struct taskNode *__searchRB(pid_t pid) {
     struct rb_node *tempNode;
     struct taskNode *currentNode;
 
-    tempNode = rb_first(&myRoot->tree);
+    tempNode = rb_first(&latRoot->tree);
     read_lock(&rb_lock);
     while (tempNode != NULL) {
-        currentNode = rb_entry(tempNode, struct taskNode, task_node);
+        currentNode = rb_entry(tempNode, struct taskNode, lat_node);
         if (currentNode->pid == pid) {
             break;
         }
-        tempNode = rb_next(&currentNode->task_node);
+        tempNode = rb_next(&currentNode->lat_node);
     }
     read_unlock(&rb_lock);
     return (tempNode == NULL) ? NULL : currentNode;
@@ -80,11 +80,11 @@ static struct taskNode *__searchRB(pid_t pid) {
 /* initialize the rb tree */
 int rb_init(void) {
     /* create the RB tree */
-    myRoot = kmalloc(sizeof(*myRoot), GFP_KERNEL);
-    if (myRoot == NULL) {
+    latRoot = kmalloc(sizeof(*latRoot), GFP_KERNEL);
+    if (latRoot == NULL) {
         return ENOMEM;
     }
-    __init_taskRoot(myRoot);
+    __init_taskRoot(latRoot);
     return 0;  
 }
 
@@ -107,7 +107,7 @@ int set_asleep(struct lat_data *ld) {
         temp->sleep_time = 0;
     } else {
         write_lock(&rb_lock);
-        rb_erase(&temp->task_node, &myRoot->tree);
+        rb_erase(&temp->lat_node, &latRoot->tree);
         write_unlock(&rb_lock);
     }
     temp->start_sleep = ld->time;
@@ -128,7 +128,7 @@ void set_awake(struct lat_data *ld) {
         return;
     } else {
         write_lock(&rb_lock);
-        rb_erase(&temp->task_node, &myRoot->tree);
+        rb_erase(&temp->lat_node, &latRoot->tree);
         write_unlock(&rb_lock);
         temp->sleep_time += (ld->time - temp->start_sleep);
         add_trace(ld, temp);
@@ -145,12 +145,12 @@ void print_rb_proc(struct seq_file *m) {
     int i = 0;
     unsigned long flags;
 
-    tempNode = rb_last(&myRoot->tree);
+    tempNode = rb_last(&latRoot->tree);
 
     seq_printf(m, "Top 1000 highest latency processes:\n");
     read_lock_irqsave(&rb_lock, flags);
     while (tempNode != NULL && i < 1000) {
-        currentNode = rb_entry(tempNode, struct taskNode, task_node);
+        currentNode = rb_entry(tempNode, struct taskNode, lat_node);
         if (currentNode->sleep_time == 0) {
             /* once a sleep time of zero is reached, exit */
             break;
@@ -159,7 +159,7 @@ void print_rb_proc(struct seq_file *m) {
                 currentNode->pid, currentNode->name, \
                 currentNode->sleep_time);
         print_table(m, currentNode);
-        tempNode = rb_prev(&currentNode->task_node);
+        tempNode = rb_prev(&currentNode->lat_node);
     }
     read_unlock_irqrestore(&rb_lock, flags);
 
@@ -171,16 +171,16 @@ void rb_free(void) {
     struct rb_node *tempNode;
     struct taskNode *tempTask;
     write_lock(&rb_lock); 
-    tempNode = rb_first(&myRoot->tree);
+    tempNode = rb_first(&latRoot->tree);
     while (tempNode != NULL) {
-        rb_erase(tempNode, &myRoot->tree);
-        tempTask = rb_entry(tempNode, struct taskNode, task_node);
+        rb_erase(tempNode, &latRoot->tree);
+        tempTask = rb_entry(tempNode, struct taskNode, lat_node);
         free_table(tempTask);
         kfree(tempTask);
-        tempNode = rb_first(&myRoot->tree);
+        tempNode = rb_first(&latRoot->tree);
     }
     write_unlock(&rb_lock);
     /* free the root */
-    kfree(myRoot);
+    kfree(latRoot);
 }
 

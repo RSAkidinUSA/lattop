@@ -23,7 +23,7 @@ struct lat_data {
 };
 
 struct taskNode {
-    struct rb_node  task_node;
+    struct rb_node  lat_node, pid_node;
     long long       sleep_time; /* key */
     int             offset; /* offset for key matches */
     pid_t           pid;
