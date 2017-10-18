@@ -156,28 +156,6 @@ void print_rb_proc(struct seq_file *m) {
 
 }
 
-/* print the 1000 longest sleeping processes*/
-/*
-void print_rb(void) {
-    struct rb_node *tempNode;
-    struct taskNode *currentNode;
-    int i = 0;
-
-    tempNode = rb_last(&myRoot->tree);
-
-    printk(PRINT_PREF "Printing rb tree:\n");
-    spin_lock(&rb_lock);
-    while (tempNode != NULL && i < 1000) {
-        currentNode = rb_entry(tempNode, struct taskNode, task_node);
-        printk(PRINT_PREF "PID: %u,\tSleep time: %llu\n", currentNode->pid, \
-                currentNode->sleep_time);
-        tempNode = rb_prev(&currentNode->task_node);
-        i++;
-    }
-    spin_unlock(&rb_lock);
-}
-*/
-
 
 /* delete the rb tree when done */
 void rb_free(void) {
