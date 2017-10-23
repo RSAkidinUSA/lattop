@@ -9,7 +9,7 @@ DEFINE_RWLOCK(hash_lock);
 
 struct st_slot {
     struct hlist_node hash_node;
-    struct stack_trace *s_t, *s_t_user;
+    struct stack_trace *s_t;
     u32 hash;
     unsigned long long sleep_time;
 };
@@ -43,76 +43,6 @@ static int __snprint_stack_trace(char *buf, size_t size,
 
 	return total;
 }
-
-/*
-void (*sstu)(struct stack_trace *trace) = (void (*)(struct stack_trace *)) 0xffffffff8da3de40;
-
-void save_stack_trace_user(struct stack_trace *trace) {
-    sstu(trace);
-}
-*/
-/* Copied save_stack_trace_user code */
-struct stack_frame_user {
-	const void __user	*next_fp;
-	unsigned long		ret_addr;
-};
-
-static int
-copy_stack_frame(const void __user *fp, struct stack_frame_user *frame)
-{
-	int ret;
-
-	if (!access_ok(VERIFY_READ, fp, sizeof(*frame)))
-		return 0;
-
-	ret = 1;
-	pagefault_disable();
-	if (__copy_from_user_inatomic(frame, fp, sizeof(*frame)))
-		ret = 0;
-	pagefault_enable();
-
-	return ret;
-}
-
-static inline void __save_stack_trace_user(struct stack_trace *trace)
-{
-	const struct pt_regs *regs = task_pt_regs(current);
-	const void __user *fp = (const void __user *)regs->bp;
-
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = regs->ip;
-
-	while (trace->nr_entries < trace->max_entries) {
-		struct stack_frame_user frame;
-
-		frame.next_fp = NULL;
-		frame.ret_addr = 0;
-		if (!copy_stack_frame(fp, &frame))
-			break;
-		if ((unsigned long)fp < regs->sp)
-			break;
-		if (frame.ret_addr) {
-			trace->entries[trace->nr_entries++] =
-				frame.ret_addr;
-		}
-		if (fp == frame.next_fp)
-			break;
-		fp = frame.next_fp;
-	}
-}
-
-void save_stack_trace_user(struct stack_trace *trace)
-{
-	/*
-	 * Trace user stack if we are not a kernel thread
-	 */
-	if (current->mm) {
-		__save_stack_trace_user(trace);
-	}
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = ULONG_MAX;
-}
-
 
 #define __BUF_SIZE 1024
 /* hash a stack trace using jhash */
@@ -153,7 +83,7 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
     u32 st_hash;
     bool found = false;
     struct st_slot *temp_slot;
-    struct stack_trace *temp_st, *temp_st_user;
+    struct stack_trace *temp_st;
     st_hash = __hash_st(ld->s_t);
     read_lock(&hash_lock);
     hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
@@ -174,13 +104,8 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
         if (temp_st == NULL) {
             goto no_st_mem;
         }
-        temp_st_user = __init_st(ld->s_t_user);
-        if (temp_st_user == NULL) {
-            goto no_st_user_mem;
-        }
         temp_slot->sleep_time = 0;
         temp_slot->s_t = temp_st;
-        temp_slot->s_t_user = temp_st_user;
         temp_slot->hash = st_hash;
         write_lock(&hash_lock);
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
@@ -189,8 +114,6 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
     temp_slot->sleep_time += (ld->time - tn->start_sleep);
     return;
 
-no_st_user_mem:
-    kfree(temp_st);
 no_st_mem:
     kfree(temp_slot);
 no_slot_mem:
@@ -233,8 +156,6 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
                 high_lat->sleep_time);
         seq_printf(m, "Kernel stack trace:\n");
         __seqprint_stack_trace(m, high_lat->s_t);
-        seq_printf(m, "User stack trace:\n");
-        __seqprint_stack_trace(m, high_lat->s_t_user);
         seq_printf(m, "\n");
     }
 }
@@ -248,7 +169,6 @@ void free_table(struct taskNode *tn) {
     hash_for_each_safe(tn->st_ht, bkt, temp, temp_slot, hash_node) {
         hash_del(&temp_slot->hash_node);
         kfree(temp_slot->s_t);
-        kfree(temp_slot->s_t_user);
         kfree(temp_slot);
     }
     write_unlock(&hash_lock);

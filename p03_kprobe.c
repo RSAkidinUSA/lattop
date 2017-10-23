@@ -20,16 +20,8 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
     struct stack_trace s_t = {
         .nr_entries = 0,
         .entries = &entries[0],
-        
         .max_entries = STACK_DEPTH,
-        .skip = 0
-    };
-    struct stack_trace s_t_user = {
-        .nr_entries = 0,
-        .entries = &entries[0],
-        
-        .max_entries = STACK_DEPTH,
-        .skip = 0
+        .skip = 0,
     };
     long long unsigned time = rdtsc();
     /* copy task_struct data */
@@ -38,13 +30,10 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
     //save_stack_trace_tsk(t_s, &s_t);
     save_stack_trace(&s_t);
     /* can't use this function cause it's not exported... try making our own */
-    save_stack_trace_user(&s_t_user);
-    /* save_stack_trace(&s_t_user); */
     /* set latency data */
     ld.pid = t_s->pid;
     ld.time = time;
     ld.s_t = &s_t;
-    ld.s_t_user = &s_t_user;
     set_awake(&ld);
     return 0;
 }
@@ -74,7 +63,6 @@ static struct kprobe kp_sleep = {
 /* kprobe pre_handler: called just before the probed instruction is executed */
 static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
 {
-    int ret;
     struct task_struct *t_s;
     struct lat_data ld;
     long long unsigned time = rdtsc();
@@ -82,8 +70,8 @@ static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
     ld.pid = t_s->pid;
     strncpy(ld.name, t_s->comm, TASK_COMM_LEN);
     ld.time = time;
-    ret = set_asleep(&ld);
-    return ret;
+    set_asleep(&ld);
+    return 0;
 }
 
 /*

@@ -35,7 +35,6 @@ static bool __add_node_l(struct taskNode *tn) {
     struct taskNode *entry;
     bool valid = true;
     /* add node to the latency rb tree */ 
-    write_lock(&rb_lock);
     while (*link) {
         parent = *link;
         entry = rb_entry(parent, struct taskNode, lat_node);
@@ -60,7 +59,6 @@ static bool __add_node_l(struct taskNode *tn) {
         rb_insert_color(&tn->lat_node, &latRoot->tree);
     }
 
-    write_unlock(&rb_lock);
     return valid;
 }
 
@@ -71,7 +69,6 @@ static void __add_node_p(struct taskNode *tn)  {
     struct rb_node *parent = NULL;
     struct taskNode *entry;
     /* add node to the latency rb tree */ 
-    write_lock(&rb_lock);
     while (*link) {
         parent = *link;
         entry = rb_entry(parent, struct taskNode, pid_node);
@@ -82,7 +79,6 @@ static void __add_node_p(struct taskNode *tn)  {
         } else {
             /* error */
             printk(PRINT_PREF "Error inserting task with the same pid: %d\n", tn->pid);
-            write_unlock(&rb_lock);
             return;
         }
     }
@@ -90,7 +86,6 @@ static void __add_node_p(struct taskNode *tn)  {
     rb_link_node(&tn->pid_node, parent, link);
     rb_insert_color(&tn->pid_node, &pidRoot->tree);
 
-    write_unlock(&rb_lock);
 }
 
 /* search tree for a node with a given PID */
@@ -99,7 +94,6 @@ static struct taskNode *__searchRB(pid_t pid) {
     struct taskNode *currentNode;
 
     tempNode = pidRoot->tree.rb_node;
-    read_lock(&rb_lock);
     while (tempNode != NULL) {
         currentNode = rb_entry(tempNode, struct taskNode, pid_node);
         if (pid < currentNode->pid) {
@@ -110,7 +104,6 @@ static struct taskNode *__searchRB(pid_t pid) {
             break;
         }
     }
-    read_unlock(&rb_lock);
     return (tempNode == NULL) ? NULL: currentNode;
 }
 
@@ -147,11 +140,13 @@ lat_err:
 int set_asleep(struct lat_data *ld) {
     struct taskNode *temp;
     bool placed;
+    write_lock(&rb_lock);
     temp = __searchRB(ld->pid);
     if (temp == NULL) {
         temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
         if (temp == NULL) {
             /* should i really do this?? It'll crash the kernel */
+            write_unlock(&rb_lock);
             return ENOMEM;
         }
         hash_init(temp->st_ht);
@@ -160,15 +155,14 @@ int set_asleep(struct lat_data *ld) {
         temp->sleep_time = 0;
         __add_node_p(temp);
     } else {
-        write_lock(&rb_lock);
         rb_erase(&temp->lat_node, &latRoot->tree);
-        write_unlock(&rb_lock);
     }
     temp->start_sleep = ld->time;
     temp->offset = 0;
     do {
         placed = __add_node_l(temp);
     } while (!placed);
+    write_unlock(&rb_lock);
 
     return 0;
 }
@@ -179,15 +173,16 @@ int set_asleep(struct lat_data *ld) {
 void set_awake(struct lat_data *ld) {
     struct taskNode *temp;
     bool placed;
+    write_lock(&rb_lock);
     temp = __searchRB(ld->pid);
     if (temp == NULL) {
+        write_unlock(&rb_lock);
         return;
     } else if (temp->start_sleep  == -1) {
+        write_unlock(&rb_lock);
         return;
     } else {
-        write_lock(&rb_lock);
         rb_erase(&temp->lat_node, &latRoot->tree);
-        write_unlock(&rb_lock);
         temp->sleep_time += (ld->time - temp->start_sleep);
         add_trace(ld, temp);
         temp->start_sleep = -1;
@@ -196,6 +191,7 @@ void set_awake(struct lat_data *ld) {
             placed = __add_node_l(temp);
         } while (!placed);
     }
+    write_unlock(&rb_lock);
 }
 
 /* print the 1000 longest sleeping processes to /proc */
