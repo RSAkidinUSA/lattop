@@ -53,3 +53,6 @@ void print_table(struct seq_file *m, struct taskNode *tn);
 /* proc functions */
 int proc_open(void);
 void proc_close(void);
+
+/* stack trace function */
+void save_stack_trace_user(struct stack_trace *trace);

@@ -117,7 +117,7 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
     if (high_lat != NULL) {
         seq_printf(m, "Max stack trace latency: %-15llu\n", \
                 high_lat->sleep_time);
-        seq_printf(m, "Kernel stack trace:\n");
+        seq_printf(m, "Stack trace:\n");
         __seqprint_stack_trace(m, high_lat->s_t);
         seq_printf(m, "\n");
     }
