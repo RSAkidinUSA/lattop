@@ -28,6 +28,7 @@ struct taskNode {
     int             offset; /* offset for key matches */
     pid_t           pid;
     char            name[TASK_COMM_LEN];
+    struct stack_trace *last_trace; /* stack trace before going to sleep */
     long long       start_sleep; /* when the task started sleeping, -1 if it isn't asleep */
     /* hashtable of stack traces for this pid */
     DECLARE_HASHTABLE(st_ht, ST_HASH_BITS);
@@ -45,7 +46,7 @@ void print_rb_proc(struct seq_file *m);
 void rb_free(void);
 
 /* hash functions */
-void add_trace(struct lat_data *ld, struct taskNode *tn);
+bool add_trace(struct lat_data *ld, struct taskNode *tn);
 void free_table(struct taskNode *tn);
 void print_table(struct seq_file *m, struct taskNode *tn);
 

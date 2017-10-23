@@ -16,6 +16,7 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
     struct lat_data ld;
+    /*
     unsigned long entries[STACK_DEPTH];
     struct stack_trace s_t = {
         .nr_entries = 0,
@@ -23,17 +24,18 @@ static int handler_wake_pre(struct kprobe *p, struct pt_regs *regs)
         .max_entries = STACK_DEPTH,
         .skip = 0,
     };
+    */
     long long unsigned time = rdtsc();
     /* copy task_struct data */
     t_s = (struct task_struct *)regs->si;
     /* save local copy of stack trace, rbtree code will handle copying */
     //save_stack_trace_tsk(t_s, &s_t);
-    save_stack_trace(&s_t);
+    //save_stack_trace(&s_t);
     /* can't use this function cause it's not exported... try making our own */
     /* set latency data */
     ld.pid = t_s->pid;
     ld.time = time;
-    ld.s_t = &s_t;
+    //ld.s_t = &s_t;
     set_awake(&ld);
     return 0;
 }
@@ -65,11 +67,20 @@ static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
 {
     struct task_struct *t_s;
     struct lat_data ld;
+    unsigned long entries[STACK_DEPTH];
+    struct stack_trace s_t = {
+        .nr_entries = 0,
+        .entries = &entries[0],
+        .max_entries = STACK_DEPTH,
+        .skip = 0,
+    };
     long long unsigned time = rdtsc();
     t_s = (struct task_struct *)regs->si;
     ld.pid = t_s->pid;
     strncpy(ld.name, t_s->comm, TASK_COMM_LEN);
+    save_stack_trace(&s_t);
     ld.time = time;
+    ld.s_t = &s_t;
     set_asleep(&ld);
     return 0;
 }

@@ -133,6 +133,31 @@ lat_err:
     return ENOMEM;
 }
 
+/* init a new stack trace with data from a given one */
+static struct stack_trace *__init_st(struct stack_trace *src) {
+    struct stack_trace *temp;
+    int i = 0;
+    temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
+    if (temp == NULL) {
+        goto err_st;
+    }
+    temp->entries = kmalloc(sizeof(unsigned long) * STACK_DEPTH, GFP_ATOMIC);
+    if (temp->entries == NULL) {
+        goto err_entries;
+    }
+    temp->max_entries = STACK_DEPTH;
+    temp->nr_entries = src->nr_entries;
+    for (i = 0; i < STACK_DEPTH; i++) {
+        temp->entries[i] = src->entries[i];
+    }
+    return temp;
+
+err_entries:
+    kfree(temp);
+err_st:
+    return temp;
+}
+
 /* set asleep */
 /* check if task in tree, if so, set sleep time */
 /* else create new node and add */
@@ -153,11 +178,13 @@ int set_asleep(struct lat_data *ld) {
         strncpy(temp->name, ld->name, TASK_COMM_LEN);
         temp->pid = ld->pid;
         temp->sleep_time = 0;
+
         __add_node_p(temp);
     } else {
         rb_erase(&temp->lat_node, &latRoot->tree);
     }
     temp->start_sleep = ld->time;
+    temp->last_trace = __init_st(ld->s_t);
     temp->offset = 0;
     do {
         placed = __add_node_l(temp);
@@ -184,7 +211,9 @@ void set_awake(struct lat_data *ld) {
     } else {
         rb_erase(&temp->lat_node, &latRoot->tree);
         temp->sleep_time += (ld->time - temp->start_sleep);
-        add_trace(ld, temp);
+        if (add_trace(ld, temp)) {
+            kfree(temp->last_trace);
+        }
         temp->start_sleep = -1;
         temp->offset = 0;
         do {

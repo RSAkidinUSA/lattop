@@ -52,38 +52,14 @@ static u32 __hash_st (struct stack_trace *s_t) {
     return jhash((void *)buf, buflen * sizeof(char), JHASH_INITVAL);
 }
 
-/* init a new stack trace with data from a given one */
-static struct stack_trace *__init_st(struct stack_trace *src) {
-    struct stack_trace *temp;
-    int i = 0;
-    temp = kmalloc(sizeof(*temp), GFP_ATOMIC);
-    if (temp == NULL) {
-        goto err_st;
-    }
-    temp->entries = kmalloc(sizeof(unsigned long) * STACK_DEPTH, GFP_ATOMIC);
-    if (temp->entries == NULL) {
-        goto err_entries;
-    }
-    temp->max_entries = STACK_DEPTH;
-    temp->nr_entries = src->nr_entries;
-    for (i = 0; i < STACK_DEPTH; i++) {
-        temp->entries[i] = src->entries[i];
-    }
-    return temp;
-
-err_entries:
-    kfree(temp);
-err_st:
-    return temp;
-}
 
 /* add a trace to the hash table or update it if it exists */
-void add_trace(struct lat_data *ld, struct taskNode *tn) {
+/* return true if it exists (free the mem) or false if not */
+bool add_trace(struct lat_data *ld, struct taskNode *tn) {
     u32 st_hash;
     bool found = false;
     struct st_slot *temp_slot;
-    struct stack_trace *temp_st;
-    st_hash = __hash_st(ld->s_t);
+    st_hash = __hash_st(tn->last_trace);
     hash_for_each_possible(tn->st_ht, temp_slot, hash_node, st_hash) {
         /* stack trace is already in the table */ 
         if (st_hash == temp_slot->hash) {
@@ -97,23 +73,17 @@ void add_trace(struct lat_data *ld, struct taskNode *tn) {
         if (temp_slot == NULL) {
             goto no_slot_mem;
         }
-        temp_st = __init_st(ld->s_t);
-        if (temp_st == NULL) {
-            goto no_st_mem;
-        }
         temp_slot->sleep_time = 0;
-        temp_slot->s_t = temp_st;
+        temp_slot->s_t = tn->last_trace;
         temp_slot->hash = st_hash;
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
     }
     temp_slot->sleep_time += (ld->time - tn->start_sleep);
-    return;
+    return found;
 
-no_st_mem:
-    kfree(temp_slot);
 no_slot_mem:
     printk(PRINT_PREF "unable to save stack trace info, no memory left\n");
-    return; 
+    return true; 
 
 
 }
