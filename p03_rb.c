@@ -175,7 +175,6 @@ int set_asleep(struct lat_data *ld) {
             return ENOMEM;
         }
         hash_init(temp->st_ht);
-        strncpy(temp->name, ld->name, TASK_COMM_LEN);
         temp->pid = ld->pid;
         temp->sleep_time = 0;
 
@@ -183,6 +182,8 @@ int set_asleep(struct lat_data *ld) {
     } else {
         rb_erase(&temp->lat_node, &latRoot->tree);
     }
+    /* this will prevent any issues with renaming of tasks */
+    strncpy(temp->name, ld->name, TASK_COMM_LEN);
     temp->start_sleep = ld->time;
     temp->last_trace = __init_st(ld->s_t);
     temp->offset = 0;
