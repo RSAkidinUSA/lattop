@@ -81,6 +81,9 @@ static int handler_sleep_pre(struct kprobe *p, struct pt_regs *regs)
  */
 static int handler_sleep_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 {
+    if (trapnr == 14) {
+        return 0; /* page faults are not an issue */
+    }
 	printk(PRINT_PREF "fault_de_handler: p->addr = 0x%p, trap #%dn", p->addr, trapnr);
 	/* Return 0 because we don't handle the fault. */
 	return 0;
