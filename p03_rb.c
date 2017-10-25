@@ -185,7 +185,7 @@ int set_asleep(struct lat_data *ld) {
     /* this will prevent any issues with renaming of tasks */
     strncpy(temp->name, ld->name, TASK_COMM_LEN);
     temp->start_sleep = ld->time;
-    temp->last_trace = __init_st(ld->s_t);
+    temp->last_trace = __init_st(ld->st);
     temp->offset = 0;
     do {
         placed = __add_node_l(temp);

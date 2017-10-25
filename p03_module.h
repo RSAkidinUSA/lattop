@@ -19,7 +19,7 @@ struct lat_data {
     pid_t pid;
     char name[TASK_COMM_LEN];
     unsigned long long time;
-    struct stack_trace *s_t;
+    struct stack_trace *st;
 };
 
 struct taskNode {

@@ -8,7 +8,7 @@
 
 struct st_slot {
     struct hlist_node hash_node;
-    struct stack_trace *s_t;
+    struct stack_trace *st;
     u32 hash;
     unsigned long long sleep_time;
 };
@@ -45,10 +45,10 @@ static int __snprint_stack_trace(char *buf, size_t size,
 
 #define __BUF_SIZE 1024
 /* hash a stack trace using jhash */
-static u32 __hash_st (struct stack_trace *s_t) {
+static u32 __hash_st (struct stack_trace *st) {
     int buflen;
     char buf[__BUF_SIZE];
-    buflen = __snprint_stack_trace(buf, __BUF_SIZE, s_t, 0);
+    buflen = __snprint_stack_trace(buf, __BUF_SIZE, st, 0);
     return jhash((void *)buf, buflen * sizeof(char), JHASH_INITVAL);
 }
 
@@ -74,7 +74,7 @@ bool add_trace(struct lat_data *ld, struct taskNode *tn) {
             goto no_slot_mem;
         }
         temp_slot->sleep_time = 0;
-        temp_slot->s_t = tn->last_trace;
+        temp_slot->st = tn->last_trace;
         temp_slot->hash = st_hash;
         hash_add(tn->st_ht, &temp_slot->hash_node, temp_slot->hash);
     }
@@ -118,7 +118,7 @@ void print_table(struct seq_file *m, struct taskNode *tn) {
         seq_printf(m, "Max stack trace latency: %-15llu\n", \
                 high_lat->sleep_time);
         seq_printf(m, "Stack trace:\n");
-        __seqprint_stack_trace(m, high_lat->s_t);
+        __seqprint_stack_trace(m, high_lat->st);
         seq_printf(m, "\n");
     }
 }
@@ -130,7 +130,7 @@ void free_table(struct taskNode *tn) {
     struct hlist_node *temp;
     hash_for_each_safe(tn->st_ht, bkt, temp, temp_slot, hash_node) {
         hash_del(&temp_slot->hash_node);
-        kfree(temp_slot->s_t);
+        kfree(temp_slot->st);
         kfree(temp_slot);
     }
 }
