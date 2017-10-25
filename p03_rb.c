@@ -212,6 +212,7 @@ void set_awake(struct lat_data *ld) {
     } else {
         rb_erase(&temp->lat_node, &latRoot->tree);
         temp->sleep_time += (ld->time - temp->start_sleep);
+        /* if the trace is no longer needed, delete it */
         if (add_trace(ld, temp)) {
             kfree(temp->last_trace);
         }

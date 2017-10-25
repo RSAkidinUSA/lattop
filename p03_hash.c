@@ -84,8 +84,6 @@ bool add_trace(struct lat_data *ld, struct taskNode *tn) {
 no_slot_mem:
     printk(PRINT_PREF "unable to save stack trace info, no memory left\n");
     return true; 
-
-
 }
 
 static void __seqprint_stack_trace(struct seq_file *m, struct stack_trace *trace) {

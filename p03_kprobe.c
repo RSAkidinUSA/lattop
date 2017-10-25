@@ -99,7 +99,7 @@ int ins_probe(void) {
     ret = register_kprobe(&kp_wake);
 	if (ret < 0) {
 		pr_err(PRINT_PREF "register_kprobe_wake failed, returned %d\n", ret);
-		return ret;
+		goto wake_fail;
 	}
 	pr_info(PRINT_PREF "Planted kprobe_wake at %p\n", kp_wake.addr);
     
@@ -109,11 +109,15 @@ int ins_probe(void) {
     ret = register_kprobe(&kp_sleep);
 	if (ret < 0) {
 		pr_err(PRINT_PREF "register_kprobe_sleep failed, returned %d\n", ret);
-		return ret;
+		goto sleep_fail;
 	}
 	pr_info(PRINT_PREF "Planted kprobe_sleep at %p\n", kp_sleep.addr);
-    
     return 0;
+
+sleep_fail:
+    unregister_kprobe(&kp_wake);
+wake_fail: 
+    return 1;
 }
 
 void rm_probe(void) {
