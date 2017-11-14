@@ -1,0 +1,18 @@
+lattop - a modular latency profiler for the linux Kernel
+Author: Ryan Burrow
+written for Virginia Tech ECE4984 - Linux Kernel Programming
+This kernel module tracks the latencies of all running tasks and their various stack traces. 
+It reports to /proc/lattop a list of the top 1000 processes and their highest latency stack trace.
+This kernel module was build from the Linus Torvalds v4.12 Kernel.
+
+To build and use this code:
+cd ~
+git clone https://github.com/RSAkidinUSA/lattop.git
+git clone https://github.com/torvalds/linux.git
+cd linux
+git checkout tags/v4.12
+make
+# You will need to install this version of the kernel or have a vm of it to use the module
+cd ~/lattop
+make
+sudo insmod lattop.ko
