@@ -3,6 +3,7 @@ Author: Ryan Burrow
 written for Virginia Tech ECE4984 - Linux Kernel Programming
 This kernel module tracks the latencies of all running tasks and their various stack traces. 
 It reports to /proc/lattop a list of the top 1000 processes and their highest latency stack trace.
+The specifications for this project are located in the file p03-latency-profiler.pdf
 This kernel module was build from the Linus Torvalds v4.12 Kernel.
 
 To build and use this code:
